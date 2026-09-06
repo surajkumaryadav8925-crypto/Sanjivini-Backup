@@ -1,0 +1,43 @@
+{
+  "name": "ArogyaSetu Healthcare",
+  "short_name": "ArogyaSetu",
+  "description": "AI-powered healthcare platform for patients, hospitals, and government health management",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["medical", "health", "government"],
+  "shortcuts": [
+    {
+      "name": "AI Triage",
+      "url": "/patient/triage",
+      "description": "Start AI symptom assessment"
+    },
+    {
+      "name": "Emergency",
+      "url": "/patient/emergency",
+      "description": "Report emergency"
+    },
+    {
+      "name": "Find Hospital",
+      "url": "/patient/hospitals",
+      "description": "Search nearby hospitals"
+    }
+  ]
+}
