@@ -118,7 +118,7 @@ IMPORTANT RULES:
         "X-Title": "ArogyaSetu Healthcare App",
       },
       body: JSON.stringify({
-        model: "anthropic/claude-3-haiku", // Fast and widely available
+        model: "openrouter/free", // Fast and widely available
         messages: openRouterMessages,
         max_tokens: 300,
         temperature: 0.7,
