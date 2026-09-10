@@ -4,10 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Input } from "
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useHospitalStore } from "@/stores";
 import { Bed, Users, AlertTriangle, Wrench, Plus, Minus, Edit2 } from "lucide-react";
+
+type WardBedField = 'totalBeds' | 'availableBeds' | 'occupiedBeds' | 'reservedBeds' | 'outOfService';
+
 export default function BedsPage() {
   const { wards, updateWardBed } = useHospitalStore();
   const [editWard, setEditWard] = useState<string | null>(null);
-  const [editData, setEditData] = useState<Record<string, number>>({});
+  const [editData, setEditData] = useState<Partial<Record<WardBedField, number>>>({});
   const totalBeds = wards.reduce((sum, w) => sum + w.totalBeds, 0);
   const totalAvailable = wards.reduce((sum, w) => sum + w.availableBeds, 0);
   const totalOccupied = wards.reduce((sum, w) => sum + w.occupiedBeds, 0);
@@ -19,10 +22,10 @@ export default function BedsPage() {
   };
   const saveEdit = () => {
     if (!editWard) return;
-    Object.entries(editData).forEach(([field, value]) => { updateWardBed(editWard, field as any, value); });
+    (Object.entries(editData) as [WardBedField, number][]).forEach(([field, value]) => { updateWardBed(editWard, field, value); });
     setEditWard(null);
   };
-  const adjustValue = (field: string, delta: number) => { setEditData(prev => ({ ...prev, [field]: Math.max(0, (prev[field] || 0) + delta) })); };
+  const adjustValue = (field: WardBedField, delta: number) => { setEditData(prev => ({ ...prev, [field]: Math.max(0, (prev[field] || 0) + delta) })); };
   return (
     <div className="container px-4 py-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-6"><div><h1 className="text-2xl font-bold">Bed Management</h1><p className="text-sm text-muted-foreground mt-1">Manage hospital bed availability and status</p></div></div>
@@ -52,7 +55,13 @@ export default function BedsPage() {
           <DialogContent>
             <DialogHeader><DialogTitle>Edit {wards.find(w => w.id === editWard)?.name}</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
-              {[{ key: 'totalBeds', label: 'Total Beds' }, { key: 'availableBeds', label: 'Available' }, { key: 'occupiedBeds', label: 'Occupied' }, { key: 'reservedBeds', label: 'Reserved' }, { key: 'outOfService', label: 'Out of Service' }].map((field) => (
+              {([
+                { key: 'totalBeds', label: 'Total Beds' },
+                { key: 'availableBeds', label: 'Available' },
+                { key: 'occupiedBeds', label: 'Occupied' },
+                { key: 'reservedBeds', label: 'Reserved' },
+                { key: 'outOfService', label: 'Out of Service' },
+              ] as const).map((field) => (
                 <div key={field.key} className="flex items-center justify-between">
                   <span className="text-sm font-medium">{field.label}</span>
                   <div className="flex items-center gap-2">

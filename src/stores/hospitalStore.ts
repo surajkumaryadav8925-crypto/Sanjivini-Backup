@@ -4,15 +4,28 @@ export type InventoryStatus = 'available' | 'low_stock' | 'out_of_stock';
 export interface Ward { id: string; name: string; totalBeds: number; availableBeds: number; occupiedBeds: number; reservedBeds: number; outOfService: number; }
 export interface InventoryItem { id: string; name: string; category: string; currentStock: number; minRequired: number; status: InventoryStatus; lastUpdated: string; }
 export interface BloodGroup { group: string; available: number; reserved: number; }
+export interface BloodRequest {
+  id: string;
+  patientName: string;
+  bloodGroup: string;
+  units: number;
+  hospitalName: string;
+  urgency: 'routine' | 'urgent' | 'emergency';
+  contactPhone: string;
+  status: 'pending' | 'approved' | 'fulfilled' | 'rejected';
+  requestedAt: string;
+}
 export interface OPDPatient { id: string; name: string; token: number; department: string; status: 'waiting' | 'called' | 'completed' | 'skipped'; addedAt: string; }
 export interface OPDDepartment { id: string; name: string; currentToken: number; patients: OPDPatient[]; }
 interface HospitalState {
-  wards: Ward[]; inventory: InventoryItem[]; bloodGroups: BloodGroup[]; departments: OPDDepartment[];
+  wards: Ward[]; inventory: InventoryItem[]; bloodGroups: BloodGroup[]; bloodRequests: BloodRequest[]; departments: OPDDepartment[];
   updateWardBed: (wardId: string, field: keyof Ward, value: number) => void;
   addInventoryItem: (item: Omit<InventoryItem, 'id'>) => void;
   updateInventoryItem: (id: string, updates: Partial<InventoryItem>) => void;
   removeInventoryItem: (id: string) => void;
   updateBloodGroup: (group: string, field: 'available' | 'reserved', value: number) => void;
+  requestBlood: (req: Omit<BloodRequest, 'id' | 'status' | 'requestedAt'>) => string;
+  updateBloodRequestStatus: (id: string, status: BloodRequest['status']) => void;
   addPatientToQueue: (departmentId: string, name: string) => void;
   callNextPatient: (departmentId: string) => void;
   markPatientComplete: (departmentId: string, patientId: string) => void;
@@ -47,6 +60,11 @@ const initialBloodGroups: BloodGroup[] = [
   { group: 'O+', available: 25, reserved: 7 }, { group: 'O-', available: 10, reserved: 2 },
 ];
 
+const initialBloodRequests: BloodRequest[] = [
+  { id: 'BR-8492', patientName: 'Sanjay Kumar', bloodGroup: 'B+', units: 2, hospitalName: 'JNMCH Blood Bank', urgency: 'urgent', contactPhone: '+91 98765 43210', status: 'approved', requestedAt: new Date(Date.now() - 3600000).toISOString() },
+  { id: 'BR-8493', patientName: 'Anita Devi', bloodGroup: 'O+', units: 1, hospitalName: 'District Hospital Blood Bank', urgency: 'routine', contactPhone: '+91 91234 56789', status: 'pending', requestedAt: new Date(Date.now() - 1800000).toISOString() },
+];
+
 const initialDepartments: OPDDepartment[] = [
   { id: 'general-med', name: 'General Medicine', currentToken: 12, patients: [
     { id: 'p1', name: 'Ramesh Kumar', token: 1, department: 'General Medicine', status: 'completed', addedAt: new Date().toISOString() },
@@ -75,7 +93,7 @@ const initialDepartments: OPDDepartment[] = [
 
 export const useHospitalStore = create<HospitalState>()(
   persist((set) => ({
-    wards: initialWards, inventory: initialInventory, bloodGroups: initialBloodGroups, departments: initialDepartments,
+    wards: initialWards, inventory: initialInventory, bloodGroups: initialBloodGroups, bloodRequests: initialBloodRequests, departments: initialDepartments,
     updateWardBed: (wardId, field, value) => set((state) => ({ wards: state.wards.map(w => w.id === wardId ? { ...w, [field]: Math.max(0, value) } : w) })),
     addInventoryItem: (item) => set((state) => ({ inventory: [...state.inventory, { ...item, id: 'inv' + Date.now() }] })),
     updateInventoryItem: (id, updates) => set((state) => ({ inventory: state.inventory.map(item => {
@@ -88,6 +106,45 @@ export const useHospitalStore = create<HospitalState>()(
     }) })),
     removeInventoryItem: (id) => set((state) => ({ inventory: state.inventory.filter(item => item.id !== id) })),
     updateBloodGroup: (group, field, value) => set((state) => ({ bloodGroups: state.bloodGroups.map(bg => bg.group === group ? { ...bg, [field]: Math.max(0, value) } : bg) })),
+    requestBlood: (req) => {
+      const newId = `BR-${Math.floor(1000 + Math.random() * 9000)}`;
+      set((state) => ({
+        bloodRequests: [
+          { ...req, id: newId, status: 'pending', requestedAt: new Date().toISOString() },
+          ...state.bloodRequests
+        ]
+      }));
+      return newId;
+    },
+    updateBloodRequestStatus: (id, status) => set((state) => {
+      const targetReq = state.bloodRequests.find(r => r.id === id);
+      if (!targetReq) return state;
+
+      // If approving, transfer available units to reserved
+      let updatedBloodGroups = state.bloodGroups;
+      if (status === 'approved' && targetReq.status !== 'approved') {
+        updatedBloodGroups = state.bloodGroups.map(bg => {
+          if (bg.group === targetReq.bloodGroup) {
+            const transfer = Math.min(bg.available, targetReq.units);
+            return { ...bg, available: Math.max(0, bg.available - transfer), reserved: bg.reserved + transfer };
+          }
+          return bg;
+        });
+      } else if (status === 'fulfilled' && targetReq.status === 'approved') {
+        // Deduct from reserved
+        updatedBloodGroups = state.bloodGroups.map(bg => {
+          if (bg.group === targetReq.bloodGroup) {
+            return { ...bg, reserved: Math.max(0, bg.reserved - targetReq.units) };
+          }
+          return bg;
+        });
+      }
+
+      return {
+        bloodGroups: updatedBloodGroups,
+        bloodRequests: state.bloodRequests.map(r => r.id === id ? { ...r, status } : r)
+      };
+    }),
     addPatientToQueue: (departmentId, name) => set((state) => ({ departments: state.departments.map(dept => {
       if (dept.id !== departmentId) return dept;
       const newToken = dept.currentToken + 1;

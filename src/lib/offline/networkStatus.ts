@@ -1,7 +1,7 @@
 // Network Status Hook
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export interface NetworkStatus {
   isOnline: boolean;
@@ -68,10 +68,16 @@ export function useSlowConnection(): boolean {
 // Hook to retry operations when back online
 export function useOnlineEffect(callback: () => void, dependencies: unknown[] = []) {
   const { isOnline } = useNetworkStatus();
+  const callbackRef = useRef(callback);
+  
+  useEffect(() => {
+    callbackRef.current = callback;
+  }, [callback]);
   
   useEffect(() => {
     if (isOnline) {
-      callback();
+      callbackRef.current();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnline, ...dependencies]);
 }

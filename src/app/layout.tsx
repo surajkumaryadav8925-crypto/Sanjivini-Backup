@@ -1,4 +1,4 @@
-﻿import type { Metadata, Viewport } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/lib/providers";
@@ -10,8 +10,8 @@ import { AIHealthCall } from "@/components/voice/AIHealthCall";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "ArogyaSetu - Healthcare Platform",
-  description: "AI-powered healthcare platform for patients, hospitals, and government health management",
+  title: "Sanjivini - Rural & Public Healthcare Accessibility Platform",
+  description: "AI-powered public and rural healthcare platform for patients, hospitals, and health administrators",
   manifest: "/manifest.json",
 };
 

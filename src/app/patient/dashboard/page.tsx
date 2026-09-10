@@ -21,16 +21,13 @@ export default function PatientDashboard() {
     { href: "/patient/insurance", icon: Shield, labelKey: "common.insurance", gradient: "from-amber-500 to-orange-600", bgLight: "bg-amber-50/70", borderLight: "border-amber-100", textColor: "text-amber-700", shadowColor: "hover:shadow-amber-200" },
     { href: "/patient/records", icon: FileText, labelKey: "records.healthRecords", gradient: "from-indigo-500 to-blue-600", bgLight: "bg-indigo-50/70", borderLight: "border-indigo-100", textColor: "text-indigo-700", shadowColor: "hover:shadow-indigo-200" },
     { href: "/patient/consultation", icon: Video, labelKey: "consultation.title", gradient: "from-purple-500 to-pink-600", bgLight: "bg-purple-50/70", borderLight: "border-purple-100", textColor: "text-purple-700", shadowColor: "hover:shadow-purple-200" },
+    { href: "/patient/family", icon: Heart, labelKey: "maternal.title", gradient: "from-rose-500 to-red-600", bgLight: "bg-rose-50/70", borderLight: "border-rose-100", textColor: "text-rose-700", shadowColor: "hover:shadow-rose-200" },
   ];
 
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section - Premium Header */}
       <div>
-        {/* Background Pattern */}
-        
-        
-        
         <div className="container relative px-4 py-10 max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             {/* Welcome Section */}
@@ -64,7 +61,7 @@ export default function PatientDashboard() {
             <Activity className="h-5 w-5 text-primary" />
             {t("patient.dashboard.quickActions")}
           </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
             {quickActions.map((action, index) => (
               <Link key={action.href} href={action.href} className="block">
                 <Card style={{ animationDelay: `${index * 100}ms` }} className={`h-full cursor-pointer border ${action.borderLight} dark:border-slate-600 bg-card dark:bg-card/95 backdrop-blur-sm shadow-sm hover:shadow-xl card-hover-lift card-active-press card-animate-in ${action.shadowColor}`}>
@@ -73,8 +70,7 @@ export default function PatientDashboard() {
                       <action.icon className="h-7 w-7 text-white" />
                     </div>
                     <div>
-                      <p className="font-semibold text-sm leading-tight ${action.textColor} dark:text-card-foreground">{t(action.labelKey)}</p>
-                      
+                      <p className={`font-semibold text-sm leading-tight ${action.textColor} dark:text-card-foreground`}>{t(action.labelKey)}</p>
                     </div>
                   </CardContent>
                 </Card>

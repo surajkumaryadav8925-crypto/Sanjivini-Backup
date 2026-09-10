@@ -122,8 +122,8 @@ export function AIHealthCall() {
     setTimeout(() => {
       setCallState("connected");
       const greeting = languageRef.current === "hi" 
-        ? "??????! ??? ???? ?????? ??? ????? ???? ??? ???? ???? ??? ?? ???? ????"
-        : "Hello! I am your Arogya AI health assistant. How can I help you today?";
+        ? "नमस्ते! मैं आपका संजीवनी एआई स्वास्थ्य सहायक हूँ। आज मैं आपकी स्वास्थ्य सेवाओं में क्या सहायता कर सकता हूँ?"
+        : "Hello! I am your Sanjivini AI health assistant. How can I help you today?";
       
       setMessages([{ role: "ai", text: greeting }]);
       speak(greeting, languageRef.current);
@@ -134,7 +134,7 @@ export function AIHealthCall() {
   const startListening = useCallback(() => {
     const recognition = recognitionRef.current;
     if (!recognition) {
-      setError(language === "hi" ? "???? ????????? ?????? ???? ???" : "Voice recognition is not available.");
+      setError(language === "hi" ? "आवाज़ पहचान समर्थित नहीं है।" : "Voice recognition is not available.");
       return;
     }
 
@@ -152,12 +152,12 @@ export function AIHealthCall() {
         setTimeout(() => {
           try { recognition.start(); }
           catch { 
-            setError(language === "hi" ? "????? ?????????? ???? ???? ?? ????" : "Could not start recording.");
+            setError(language === "hi" ? "माइक्रोफ़ोन शुरू नहीं हो सका।" : "Could not start recording.");
             setCallState("connected");
           }
         }, 100);
       } catch { 
-        setError(language === "hi" ? "????? ?????????? ???? ???? ?? ????" : "Could not start recording.");
+        setError(language === "hi" ? "माइक्रोफ़ोन शुरू नहीं हो सका।" : "Could not start recording.");
         setCallState("connected");
       }
     }
@@ -187,7 +187,7 @@ export function AIHealthCall() {
     })
     .then(res => res.json())
     .then(data => {
-      const response = data.response || data.error || (languageRef.current === "hi" ? "????? ????, ??? ???? ????" : "Sorry, something went wrong.");
+      const response = data.response || data.error || (languageRef.current === "hi" ? "क्षमा करें, कोई तकनीकी त्रुटि हुई।" : "Sorry, something went wrong.");
       
       setMessages(prev => [...prev, { role: "ai", text: response }]);
       setChatHistory(prev => [...prev, { role: "user", content: transcript }, { role: "assistant", content: response }]);
@@ -198,7 +198,7 @@ export function AIHealthCall() {
     })
     .catch(() => {
       const fallback = languageRef.current === "hi" 
-        ? "??????? ?????? ??? ????? ???? ?????? ?????"
+        ? "नेटवर्क त्रुटि हुई। स्थानीय स्वास्थ्य सहायक से कनेक्ट किया जा रहा है।"
         : "Network error. Please try again.";
       setMessages(prev => [...prev, { role: "ai", text: fallback }]);
       setError(fallback);
@@ -225,25 +225,25 @@ export function AIHealthCall() {
     };
     
     const handleError = (event: SpeechRecognitionErrorEvent) => {
-      let errorMsg = language === "hi" ? "?? ?????? ????" : "An error occurred.";
+      let errorMsg = language === "hi" ? "कोई त्रुटि हुई।" : "An error occurred.";
       switch (event.error) {
         case "not-allowed":
         case "service-not-allowed":
-          errorMsg = language === "hi" ? "?????????? ?? ?????? ???? ?????" : "Microphone permission denied.";
+          errorMsg = language === "hi" ? "माइक्रोफ़ोन की अनुमति अस्वीकृत हुई।" : "Microphone permission denied.";
           break;
         case "no-speech":
-          errorMsg = language === "hi" ? "??? ????? ???? ????? ???" : "No speech detected.";
+          errorMsg = language === "hi" ? "कोई आवाज़ नहीं मिली।" : "No speech detected.";
           break;
         case "audio-capture":
-          errorMsg = language === "hi" ? "?????????? ???? ?????" : "No microphone found.";
+          errorMsg = language === "hi" ? "माइक्रोफ़ोन नहीं मिला।" : "No microphone found.";
           break;
         case "network":
-          errorMsg = language === "hi" ? "??????? ???????" : "Network error.";
+          errorMsg = language === "hi" ? "नेटवर्क त्रुटि।" : "Network error.";
           break;
         case "aborted":
           return;
         default:
-          errorMsg = `${language === "hi" ? "??????:" : "Error:"} ${event.error}`;
+          errorMsg = `${language === "hi" ? "त्रुटि:" : "Error:"} ${event.error}`;
       }
       setError(errorMsg);
       setCallState("connected");
@@ -353,7 +353,7 @@ export function AIHealthCall() {
               <Bot className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h3 className="font-semibold text-sm">{t("aiCall.title") || "Arogya AI Assistant"}</h3>
+              <h3 className="font-semibold text-sm">{t("aiCall.title") || "Sanjivini AI Assistant"}</h3>
               <div className="flex items-center gap-1.5">
                 <div className={`h-2 w-2 rounded-full ${
                   callState === "connected" ? "bg-emerald-500" :

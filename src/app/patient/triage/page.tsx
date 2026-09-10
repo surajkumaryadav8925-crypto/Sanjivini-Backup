@@ -1,10 +1,10 @@
-﻿"use client";
+"use client";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Label, Badge, Alert, AlertDescription } from "@/components/ui";
 import { SpeakButton } from "@/components/ui/SpeakButton";
 import { performTriage, getRiskColorClass, getRiskLabel } from "@/lib/ai/triage";
 import { Stethoscope, Shield, AlertTriangle } from "lucide-react";
-import type { TriageSymptom, TriageResult } from "@/types";
+import type { TriageResult } from "@/types";
 import Link from "next/link";
 import { useTranslation } from "@/hooks/useTranslation";
 
@@ -34,12 +34,17 @@ export default function TriagePage() {
   const resultText = result ? `${result.recommended_action}. ${t("patient.triage.disclaimer")}` : "";
 
   return (
-    <div className="container px-4 py-6 max-w-2xl mx-auto">
+    <div className="container px-4 py-6 max-w-2xl mx-auto space-y-4">
       <div className="flex items-start justify-between mb-2">
-        <h1 className="text-2xl font-bold"><Stethoscope className="inline h-6 w-6 mr-2" />{t("patient.triage.title")}</h1>
+        <h1 className="text-2xl font-bold"><Stethoscope className="inline h-6 w-6 mr-2 text-primary" />{t("patient.triage.title")}</h1>
         <SpeakButton text={!result ? triageIntro : resultText} />
       </div>
-      <Alert variant="warning" className="mb-4 bg-amber-50"><AlertDescription><Shield className="inline h-4 w-4 mr-1" />{t("patient.triage.assistiveOnly")}</AlertDescription></Alert>
+      <Alert variant="warning" className="bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200">
+        <AlertDescription className="flex items-center gap-1.5">
+          <Shield className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          {t("patient.triage.assistiveOnly")}
+        </AlertDescription>
+      </Alert>
 
       {!result ? (
         <Card>
@@ -55,19 +60,37 @@ export default function TriagePage() {
                 <Button key={g} variant={gender === g ? "default" : "outline"} size="sm" className="flex-1" onClick={() => setGender(g)}>{t(`patient.triage.${g}`)}</Button>
               ))}</div></div>
             </div>
-            <Button className="w-full bg-blue-500" onClick={analyze} disabled={!symptoms.length || !age} isLoading={loading}>{t("patient.triage.analyze")}</Button>
+            <Button className="w-full bg-blue-500 hover:bg-blue-600" onClick={analyze} disabled={!symptoms.length || !age} isLoading={loading}>{t("patient.triage.analyze")}</Button>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-4">
-          <Card className={`border-2 ${result.risk_level === "red" ? "border-red-500 bg-red-50" : result.risk_level === "yellow" ? "border-amber-500 bg-amber-50" : "border-emerald-500 bg-emerald-50"}`}>
+          <Card className={`border-2 ${
+            result.risk_level === "red"
+              ? "border-red-500 dark:border-red-600 bg-red-50 dark:bg-red-950/40 text-red-950 dark:text-red-100"
+              : result.risk_level === "yellow"
+              ? "border-amber-500 dark:border-amber-600 bg-amber-50 dark:bg-amber-950/40 text-amber-950 dark:text-amber-100"
+              : "border-emerald-500 dark:border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-100"
+          }`}>
             <CardHeader><CardTitle><Badge className={`${getRiskColorClass(result.risk_level)}`}>{getRiskLabel(result.risk_level)}</Badge> {result.confidence}% {t("patient.triage.confidence")}</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              <p className="font-medium">{result.recommended_action}</p>
-              {result.red_flags.length > 0 && <div className="p-2 bg-red-100 rounded"><p className="font-medium text-red-700 flex items-center gap-1"><AlertTriangle className="h-4 w-4" />{t("patient.triage.redFlags")}</p><ul className="list-disc list-inside text-red-600 text-sm">{result.red_flags.map((f, i) => <li key={i}>{f}</li>)}</ul></div>}
-              <div className="p-2 bg-background rounded border"><p className="font-medium text-sm">{t("patient.triage.possible")} {result.possible_conditions.join(", ")}</p></div>
-              <div className="p-2 bg-background rounded border"><p className="font-medium text-sm">{t("patient.triage.specialist")} {result.recommended_specialization}</p></div>
-              <p className="text-xs text-muted-foreground p-2 bg-muted rounded">{t("patient.triage.disclaimer")}</p>
+              <p className="font-semibold text-base">{result.recommended_action}</p>
+              {result.red_flags.length > 0 && (
+                <div className="p-3 bg-red-100 dark:bg-red-900/40 rounded-lg">
+                  <p className="font-semibold text-red-800 dark:text-red-200 flex items-center gap-1.5 text-sm">
+                    <AlertTriangle className="h-4 w-4" />
+                    {t("patient.triage.redFlags")}
+                  </p>
+                  <ul className="list-disc list-inside text-red-700 dark:text-red-300 text-xs mt-1 space-y-0.5">
+                    {result.red_flags.map((f, i) => (
+                      <li key={i}>{f}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <div className="p-2.5 bg-background rounded-lg border text-foreground"><p className="font-medium text-sm">{t("patient.triage.possible")} {result.possible_conditions.join(", ")}</p></div>
+              <div className="p-2.5 bg-background rounded-lg border text-foreground"><p className="font-medium text-sm">{t("patient.triage.specialist")} {result.recommended_specialization}</p></div>
+              <p className="text-xs text-muted-foreground p-2.5 bg-muted rounded-lg">{t("patient.triage.disclaimer")}</p>
             </CardContent>
           </Card>
           <div className="flex gap-2">

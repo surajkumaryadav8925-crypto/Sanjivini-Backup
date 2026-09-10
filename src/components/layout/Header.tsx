@@ -4,7 +4,7 @@ import {usePathname} from "next/navigation";
 import {useAuthStore,useOfflineStore,useUIStore} from "@/stores";
 import {cn} from "@/lib/utils";
 import {Button} from "@/components/ui";
-import {Menu,X,User,LogOut,Wifi,WifiOff,RefreshCw,Home,Stethoscope,Building2,Shield,Heart,ChevronDown,Sun,Moon} from "lucide-react";
+import {Menu,X,User,LogOut,WifiOff,RefreshCw,Home,Stethoscope,Building2,Shield,Heart,ChevronDown,Sun,Moon,FileText,Activity} from "lucide-react";
 import {useState,useSyncExternalStore}from"react";
 import {LanguageSelector}from"./LanguageSelector";
 import {NotificationBell}from"./NotificationBell";
@@ -22,17 +22,18 @@ const navConfig:Record<UserRole,NavItem[]>={
   hospital_staff:[
     {href:"/hospital/dashboard",labelKey:"common.dashboard",icon:Home},
     {href:"/hospital/beds",labelKey:"common.beds",icon:Building2},
-    {href:"/hospital/inventory",labelKey:"common.inventory",icon:Stethoscope}
+    {href:"/hospital/inventory",labelKey:"common.inventory",icon:Stethoscope},
+    {href:"/hospital/records",labelKey:"common.records",icon:FileText}
   ],
   government_admin:[
     {href:"/admin/dashboard",labelKey:"common.dashboard",icon:Home},
     {href:"/admin/hospitals",labelKey:"common.hospitals",icon:Building2},
-    {href:"/admin/analytics",labelKey:"common.settings",icon:Shield}
+    {href:"/admin/analytics",labelKey:"common.analytics",icon:Activity}
   ],
   super_admin:[
     {href:"/admin/dashboard",labelKey:"common.dashboard",icon:Home},
     {href:"/admin/hospitals",labelKey:"common.hospitals",icon:Building2},
-    {href:"/admin/analytics",labelKey:"common.settings",icon:Shield}
+    {href:"/admin/analytics",labelKey:"common.analytics",icon:Activity}
   ]
 };
 export function Header(){
