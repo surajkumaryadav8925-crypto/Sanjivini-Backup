@@ -1,95 +1,201 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Input, Label } from "@/components/ui";
 import { SpeakButton } from "@/components/ui/SpeakButton";
-import { Droplet, Search, Phone, MapPin, CheckCircle2, Clock, ShieldAlert, HeartHandshake } from "lucide-react";
+import { Droplet, Search, Phone, MapPin, CheckCircle2, Clock, ShieldAlert, HeartHandshake, Loader2, AlertTriangle } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
-import { useHospitalStore, type BloodRequest } from "@/stores";
+import { useHospitalStore } from "@/stores";
+import { useSupabaseData } from "@/lib/data/mode";
+import {
+  fetchBloodBanks,
+  fetchBloodRequests,
+  createBloodRequest,
+  type BloodBankView,
+} from "@/lib/data/blood";
+import { getMyPatientId as resolvePatientId } from "@/lib/data/emergency";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
+/** i18n keys for hardcoded English UI copy in the request form. */
+const STATUS_KEYS: Record<string, string> = {
+  "Patient Full Name *": "patient.blood.form.patientName",
+  "Blood Group *": "patient.blood.form.bloodGroup",
+  "Units Required *": "patient.blood.form.unitsRequired",
+  "Urgency Level": "patient.blood.form.urgencyLevel",
+  "Attendant Contact Number *": "patient.blood.form.contactNumber",
+  "Cancel": "common.cancel",
+  "Send Request": "patient.blood.form.send",
+};
+const statusText = (key: string, t: (k: string) => string) => t(STATUS_KEYS[key] ?? "") || key;
+
+interface UiRequest {
+  id: string;
+  patientName: string;
+  bloodGroup: string;
+  units: number;
+  hospitalName: string;
+  urgency: "routine" | "urgent" | "emergency";
+  contactPhone: string;
+  status: "pending" | "approved" | "fulfilled" | "rejected";
+  requestedAt: string;
+}
+
 export default function BloodPage() {
   const { t } = useTranslation();
-  const { bloodGroups, bloodRequests, requestBlood } = useHospitalStore();
+  const { bloodGroups, requestBlood } = useHospitalStore();
+  const demoStoreRequests = useHospitalStore((s) => s.bloodRequests);
+  const useDb = useSupabaseData();
 
   const [selectedGroup, setSelectedGroup] = useState<string>("");
   const [search, setSearch] = useState("");
   const [requestModalOpen, setRequestModalOpen] = useState(false);
-  const [targetHospital, setTargetHospital] = useState("JNMCH Blood Bank");
+  const [targetHospital, setTargetHospital] = useState("");
+  const [targetHospitalId, setTargetHospitalId] = useState<string | null>(null);
   const [lastSubmittedId, setLastSubmittedId] = useState<string | null>(null);
+
+  // --- Live data (production mode) ---
+  const [banks, setBanks] = useState<BloodBankView[]>([]);
+  const [loading, setLoading] = useState(useDb);
+  const [error, setError] = useState<string | null>(null);
+  const [myRequests, setMyRequests] = useState<UiRequest[]>([]);
+
+  const loadRequests = () => {
+    if (!useDb) return;
+    fetchBloodRequests()
+      .then((rows) =>
+        setMyRequests(
+          rows.map((r) => ({
+            id: r.id,
+            patientName: r.patient_name,
+            bloodGroup: r.blood_group,
+            units: r.units,
+            hospitalName: r.hospital_name ?? "",
+            urgency: r.urgency,
+            contactPhone: r.contact_phone,
+            status: r.status,
+            requestedAt: r.created_at,
+          }))
+        )
+      )
+      .catch(() => setMyRequests([]));
+  };
+
+  useEffect(() => {
+    if (!useDb) return;
+    let cancelled = false;
+    Promise.all([fetchBloodBanks(), resolvePatientId()])
+      .then(([bankRows]) => {
+        if (!cancelled) {
+          setBanks(bankRows);
+          setError(null);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load blood banks");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    loadRequests();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [useDb]);
 
   // Request form state
   const [patientName, setPatientName] = useState("");
   const [unitsNeeded, setUnitsNeeded] = useState("1");
-  const [urgency, setUrgency] = useState<BloodRequest["urgency"]>("urgent");
+  const [urgency, setUrgency] = useState<"routine" | "urgent" | "emergency">("urgent");
   const [contactPhone, setContactPhone] = useState("+91 98765 43210");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const bloodBanks = [
+  // Demo fixtures (demo mode only) — identical to the original showcase data.
+  const demoBanks: BloodBankView[] = [
     {
       id: "bb-1",
       hospital: "JNMCH Blood Bank",
       address: "Mayaganj, Bhagalpur",
       phone: "+91 641 240 1078",
-      isLiveStore: true,
+      inventory: Object.fromEntries(bloodGroups.map((bg) => [bg.group, bg.available])),
+      totalUnits: bloodGroups.reduce((s, bg) => s + bg.available, 0),
     },
     {
       id: "bb-2",
       hospital: "District Hospital Blood Bank",
       address: "Barari Road, Bhagalpur",
       phone: "+91 641 242 0012",
-      isLiveStore: false,
+      inventory: { "A+": 12, "B+": 18, "O+": 10, "AB+": 4, "A-": 2, "B-": 3, "O-": 1, "AB-": 0 },
+      totalUnits: 50,
     },
     {
       id: "bb-3",
       hospital: "Sultanganj Referral Hospital Blood Storage",
       address: "Sultanganj, Bhagalpur",
       phone: "+91 641 254 3210",
-      isLiveStore: false,
+      inventory: { "A+": 4, "B+": 6, "O+": 5, "AB+": 1, "A-": 1, "B-": 1, "O-": 2, "AB-": 0 },
+      totalUnits: 20,
     },
   ];
 
+  const bloodBanks: BloodBankView[] = useDb ? banks : demoBanks;
+
   const getAvailableUnits = (bankId: string, group: string) => {
-    if (bankId === "bb-1") {
-      const match = bloodGroups.find((bg) => bg.group === group);
-      return match ? match.available : 0;
-    }
-    const pseudoMap: Record<string, number> = {
-      "bb-2": { "A+": 12, "B+": 18, "O+": 10, "AB+": 4, "A-": 2, "B-": 3, "O-": 1, "AB-": 0 }[group] ?? 4,
-      "bb-3": { "A+": 4, "B+": 6, "O+": 5, "AB+": 1, "A-": 1, "B-": 1, "O-": 2, "AB-": 0 }[group] ?? 2,
-    };
-    return pseudoMap[bankId] ?? 0;
+    const bank = bloodBanks.find((b) => b.id === bankId);
+    return bank?.inventory[group] ?? 0;
   };
 
-  const openRequestDialog = (hospitalName: string, defaultGroup?: string) => {
-    setTargetHospital(hospitalName);
+  const openRequestDialog = (bank: BloodBankView, defaultGroup?: string) => {
+    setTargetHospital(bank.hospital);
+    setTargetHospitalId(bank.id);
+    setSubmitError(null);
     if (defaultGroup) setSelectedGroup(defaultGroup);
     setRequestModalOpen(true);
   };
 
-  const handleSubmitRequest = (e: React.FormEvent) => {
+  const handleSubmitRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!patientName.trim()) return;
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      const reqId = requestBlood({
-        patientName: patientName.trim(),
-        bloodGroup: selectedGroup || "O+",
-        units: Math.max(1, parseInt(unitsNeeded) || 1),
-        hospitalName: targetHospital,
-        urgency,
-        contactPhone,
-      });
-
-      setLastSubmittedId(reqId);
-      setIsSubmitting(false);
+    try {
+      if (useDb) {
+        if (!targetHospitalId) throw new Error("Please choose a blood bank.");
+        const patientId = await resolvePatientId();
+        if (!patientId) throw new Error("No patient profile found for this account.");
+        const id = await createBloodRequest({
+          patientId,
+          hospitalId: targetHospitalId,
+          patientName: patientName.trim(),
+          bloodGroup: selectedGroup || "O+",
+          units: Math.max(1, parseInt(unitsNeeded) || 1),
+          urgency,
+          contactPhone,
+        });
+        setLastSubmittedId(id);
+        loadRequests();
+      } else {
+        const reqId = requestBlood({
+          patientName: patientName.trim(),
+          bloodGroup: selectedGroup || "O+",
+          units: Math.max(1, parseInt(unitsNeeded) || 1),
+          hospitalName: targetHospital,
+          urgency,
+          contactPhone,
+        });
+        setLastSubmittedId(reqId);
+      }
       setRequestModalOpen(false);
       setPatientName("");
-    }, 400);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Could not submit request.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const filteredBanks = bloodBanks.filter(
+  const filteredBanks: BloodBankView[] = bloodBanks.filter(
     (b) =>
       b.hospital.toLowerCase().includes(search.toLowerCase()) ||
       b.address.toLowerCase().includes(search.toLowerCase())
@@ -106,28 +212,28 @@ export default function BloodPage() {
             {t("patient.blood.title")}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Real-time blood stock verification & direct reservation request
+            {t("patient.blood.realtimeNote")}
           </p>
         </div>
         <SpeakButton text={instructions} />
       </div>
 
       {lastSubmittedId && (
-        <Card className="border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 border-2">
+        <Card className="border-success/40 bg-success-soft">
           <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-6 w-6 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <CheckCircle2 className="h-6 w-6 text-success shrink-0" />
               <div>
-                <p className="font-semibold text-emerald-900 dark:text-emerald-200">
-                  Blood Requisition Request Confirmed!
+                <p className="font-semibold text-success-soft-foreground">
+                  {t("patient.blood.refConfirmed")}
                 </p>
-                <p className="text-xs text-emerald-700 dark:text-emerald-300">
-                  Ref ID: <span className="font-mono font-bold">{lastSubmittedId}</span>. The hospital blood bank has received your requisition.
+                <p className="text-xs text-success-soft-foreground/80">
+                  {t("patient.blood.refId")}: <span className="font-mono font-bold">{lastSubmittedId}</span>. {t("patient.blood.refBody")}
                 </p>
               </div>
             </div>
             <Button size="sm" variant="outline" onClick={() => setLastSubmittedId(null)}>
-              Dismiss
+              {t("patient.blood.dismiss")}
             </Button>
           </CardContent>
         </Card>
@@ -145,7 +251,7 @@ export default function BloodPage() {
                 className="h-7 text-xs text-muted-foreground"
                 onClick={() => setSelectedGroup("")}
               >
-                Clear filter
+                {t("patient.blood.clearFilter")}
               </Button>
             )}
           </div>
@@ -173,23 +279,67 @@ export default function BloodPage() {
         </CardContent>
       </Card>
 
+      {useDb && loading && (
+        <Card className="border-dashed">
+          <CardContent className="py-12 text-center">
+            <Loader2 className="h-8 w-8 mx-auto mb-3 text-primary animate-spin" />
+            <p className="text-sm text-muted-foreground">{t("patient.blood.loadingInventory")}</p>
+          </CardContent>
+        </Card>
+      )}
+      {useDb && error && (
+        <Card className="border-destructive/30 bg-danger-soft">
+          <CardContent className="py-6 text-center space-y-3">
+            <p className="text-sm font-medium text-danger-soft-foreground">
+              {t("patient.blood.loadError")}: {error}
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setLoading(true);
+                setError(null);
+                fetchBloodBanks()
+                  .then(setBanks)
+                  .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load blood banks"))
+                  .finally(() => setLoading(false));
+              }}
+            >
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+      {useDb && !loading && !error && bloodBanks.length === 0 && (
+        <Card className="border-dashed">
+          <CardContent className="py-12 text-center">
+            <Droplet className="h-8 w-8 mx-auto mb-3 text-muted-foreground opacity-50" />
+            <p className="text-sm text-muted-foreground">
+              {t("patient.blood.emptyBanks")}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Search Bar */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder={t("patient.blood.searchPlaceholder")}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-10 h-11"
-        />
-      </div>
+      {!loading && !error && (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder={t("patient.blood.searchPlaceholder")}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10 h-11"
+          />
+        </div>
+      )}
 
       {/* Blood Bank Cards */}
       <div className="space-y-4">
         {filteredBanks.map((bank) => {
           const availableUnitsForGroup = selectedGroup
             ? getAvailableUnits(bank.id, selectedGroup)
-            : bloodGroups.reduce((acc, bg) => acc + (bank.id === "bb-1" ? bg.available : 6), 0);
+            : bank.totalUnits;
 
           return (
             <Card
@@ -208,9 +358,9 @@ export default function BloodPage() {
                     <CardTitle className="text-lg flex items-center gap-2">
                       <Droplet className="h-5 w-5 text-red-500 fill-red-500" />
                       {bank.hospital}
-                      {bank.isLiveStore && (
-                        <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40">
-                          Live Store Connected
+                      {useDb && (
+                        <Badge variant="outline" className="text-[10px] text-success border-success/40 bg-success-soft">
+                          {t("patient.blood.liveStore")}
                         </Badge>
                       )}
                     </CardTitle>
@@ -266,7 +416,7 @@ export default function BloodPage() {
                 <div className="flex flex-col sm:flex-row gap-2 pt-1">
                   <Button
                     className="flex-1 bg-red-600 hover:bg-red-700 text-white gap-2 font-medium"
-                    onClick={() => openRequestDialog(bank.hospital, selectedGroup)}
+                    onClick={() => openRequestDialog(bank, selectedGroup)}
                   >
                     <HeartHandshake className="h-4 w-4" />
                     Request Blood Units
@@ -285,7 +435,7 @@ export default function BloodPage() {
       </div>
 
       {/* Active Blood Requests List */}
-      {bloodRequests.length > 0 && (
+      {(useDb ? myRequests : demoStoreRequests).length > 0 && (
         <Card className="mt-8">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -294,7 +444,7 @@ export default function BloodPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {bloodRequests.slice(0, 4).map((req) => (
+            {(useDb ? myRequests : demoStoreRequests).slice(0, 4).map((req) => (
               <div
                 key={req.id}
                 className="flex items-center justify-between p-3 rounded-lg border bg-muted/30 text-sm"
@@ -367,7 +517,7 @@ export default function BloodPage() {
 
             <form onSubmit={handleSubmitRequest} className="space-y-4">
               <div>
-                <Label className="text-xs font-semibold">Patient Full Name *</Label>
+                <Label className="text-xs font-semibold">{statusText("Patient Full Name *", t)}</Label>
                 <Input
                   required
                   placeholder="e.g. Ramesh Kumar"
@@ -379,7 +529,7 @@ export default function BloodPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs font-semibold">Blood Group *</Label>
+                  <Label className="text-xs font-semibold">{statusText("Blood Group *", t)}</Label>
                   <select
                     className="w-full mt-1 h-10 px-3 rounded-md border bg-background text-sm font-semibold"
                     value={selectedGroup || "O+"}
@@ -393,7 +543,7 @@ export default function BloodPage() {
                   </select>
                 </div>
                 <div>
-                  <Label className="text-xs font-semibold">Units Required *</Label>
+                  <Label className="text-xs font-semibold">{statusText("Units Required *", t)}</Label>
                   <Input
                     type="number"
                     min="1"
@@ -406,7 +556,7 @@ export default function BloodPage() {
               </div>
 
               <div>
-                <Label className="text-xs font-semibold">Urgency Level</Label>
+                <Label className="text-xs font-semibold">{statusText("Urgency Level", t)}</Label>
                 <div className="grid grid-cols-3 gap-2 mt-1">
                   {(["routine", "urgent", "emergency"] as const).map((lvl) => (
                     <Button
@@ -430,7 +580,7 @@ export default function BloodPage() {
               </div>
 
               <div>
-                <Label className="text-xs font-semibold">Attendant Contact Number *</Label>
+                <Label className="text-xs font-semibold">{statusText("Attendant Contact Number *", t)}</Label>
                 <Input
                   required
                   value={contactPhone}
@@ -438,6 +588,13 @@ export default function BloodPage() {
                   className="mt-1"
                 />
               </div>
+
+              {submitError && (
+                <p className="text-xs text-red-600 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-lg p-2.5 flex items-start gap-2">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  {submitError}
+                </p>
+              )}
 
               <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-lg text-xs text-red-700 dark:text-red-300 flex items-start gap-2">
                 <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
@@ -453,14 +610,14 @@ export default function BloodPage() {
                   className="flex-1"
                   onClick={() => setRequestModalOpen(false)}
                 >
-                  Cancel
+                  {statusText("Cancel", t)}
                 </Button>
                 <Button
                   type="submit"
                   disabled={isSubmitting}
                   className="flex-1 bg-red-600 hover:bg-red-700 text-white"
                 >
-                  {isSubmitting ? "Submitting..." : "Send Request"}
+                  {isSubmitting ? statusText("Send Request", t) + "…" : statusText("Send Request", t)}
                 </Button>
               </div>
             </form>

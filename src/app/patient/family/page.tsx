@@ -1,18 +1,9 @@
 "use client";
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Input, Label, Alert, AlertDescription } from "@/components/ui";
+import { Card, CardContent, Button, Badge, Input, Label, Alert, AlertDescription } from "@/components/ui";
 import { SpeakButton } from "@/components/ui/SpeakButton";
 import {
-  Heart,
-  User,
-  Plus,
-  Trash2,
-  Baby,
-  CheckCircle2,
-  AlertTriangle,
-  Pill,
-  ShieldCheck,
-  Check,
+  Heart, User, Plus, Trash2, Baby, CheckCircle2, AlertTriangle, Pill, ShieldCheck, Check,
 } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 
@@ -42,6 +33,13 @@ interface VaccineDose {
   stage: string;
   status: "completed" | "due" | "upcoming";
   administeredDate?: string;
+}
+
+/** Local interpolation for strings like "administeredOf": "{done} of {total} administered". */
+function tf(template: string, values: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (_, key) =>
+    key in values ? String(values[key]) : `{${key}}`
+  );
 }
 
 export default function FamilyPage() {
@@ -160,121 +158,103 @@ export default function FamilyPage() {
 
   const instructions = `${t("patient.family.title")}. ${t("patient.family.intro")}`;
 
+  const tabs: { key: "members" | "maternal" | "child"; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+    { key: "members", label: t("patient.family.tabMembers"), icon: User },
+    { key: "maternal", label: t("patient.family.tabMaternal"), icon: Heart },
+    { key: "child", label: t("patient.family.tabChild"), icon: Baby },
+  ];
+
   return (
     <div className="container px-4 py-6 max-w-3xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Heart className="h-6 w-6 text-rose-500 fill-rose-500" />
-            {t("patient.family.title")}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Family health records, maternal care (ANC), and universal immunization
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{t("patient.family.title")}</h1>
+          <p className="mt-1 text-sm text-muted-foreground sm:text-base">{t("patient.family.pageIntro")}</p>
         </div>
         <SpeakButton text={instructions} />
       </div>
 
       {/* Tabs */}
-      <div className="flex bg-muted p-1 rounded-xl">
-        <Button
-          variant={activeTab === "members" ? "default" : "ghost"}
-          size="sm"
-          onClick={() => setActiveTab("members")}
-          className="flex-1 text-xs"
-        >
-          <User className="h-3.5 w-3.5 mr-1.5" />
-          Members ({members.length})
-        </Button>
-        <Button
-          variant={activeTab === "maternal" ? "default" : "ghost"}
-          size="sm"
-          onClick={() => setActiveTab("maternal")}
-          className="flex-1 text-xs"
-        >
-          <Heart className="h-3.5 w-3.5 mr-1.5 text-rose-500" />
-          Maternal ANC
-        </Button>
-        <Button
-          variant={activeTab === "child" ? "default" : "ghost"}
-          size="sm"
-          onClick={() => setActiveTab("child")}
-          className="flex-1 text-xs"
-        >
-          <Baby className="h-3.5 w-3.5 mr-1.5 text-blue-500" />
-          Child Vaccines
-        </Button>
+      <div className="flex gap-1 rounded-2xl bg-muted p-1" role="tablist" aria-label={t("patient.family.title")}>
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            role="tab"
+            aria-selected={activeTab === tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`inline-flex min-h-[40px] flex-1 items-center justify-center gap-1.5 rounded-xl px-2 text-xs font-semibold transition-all sm:text-sm ${
+              activeTab === tab.key
+                ? "bg-card text-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <tab.icon className={`h-4 w-4 ${tab.key === "maternal" ? "text-rose-500" : tab.key === "child" ? "text-sky-500" : "text-primary"}`} aria-hidden />
+            {tab.label}
+            {tab.key === "members" && ` (${members.length})`}
+          </button>
+        ))}
       </div>
 
       {/* TAB 1: Family Members */}
       {activeTab === "members" && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium">Registered Household Dependents</p>
-            <Button onClick={() => setShowForm(!showForm)} size="sm" className="gap-1">
-              <Plus className="h-4 w-4" />
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium text-muted-foreground">{t("patient.family.household")}</p>
+            <Button onClick={() => setShowForm(!showForm)} size="sm" className="gap-1.5">
+              <Plus className="h-4 w-4" aria-hidden />
               {t("patient.family.addMember")}
             </Button>
           </div>
 
           {showForm && (
-            <Card className="border-primary/50 shadow-md">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">{t("patient.family.addNewMember")}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-xs">Full Name</Label>
+            <Card className="border-primary/40">
+              <CardContent className="space-y-3 p-5">
+                <p className="font-semibold">{t("patient.family.addNewMember")}</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">{t("patient.family.fullName")}</Label>
                     <Input
                       placeholder={t("patient.family.namePlaceholder")}
                       value={form.name}
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      className="mt-1"
                     />
                   </div>
-                  <div>
-                    <Label className="text-xs">Relationship</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">{t("patient.family.relationship")}</Label>
                     <Input
                       placeholder={t("patient.family.relationPlaceholder")}
                       value={form.relation}
                       onChange={(e) => setForm({ ...form, relation: e.target.value })}
-                      className="mt-1"
                     />
                   </div>
-                  <div>
-                    <Label className="text-xs">Age (Years)</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">{t("patient.family.ageYears")}</Label>
                     <Input
                       type="number"
+                      inputMode="numeric"
                       placeholder={t("patient.family.agePlaceholder")}
                       value={form.age}
                       onChange={(e) => setForm({ ...form, age: e.target.value })}
-                      className="mt-1"
                     />
                   </div>
-                  <div>
-                    <Label className="text-xs">Blood Group</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">{t("patient.family.bloodGroup")}</Label>
                     <select
+                      aria-label={t("patient.family.bloodGroup")}
                       value={form.bloodGroup}
                       onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })}
-                      className="w-full mt-1 h-10 px-3 rounded-md border bg-background text-xs font-semibold"
+                      className="h-10 w-full rounded-md border bg-background px-3 text-sm font-semibold"
                     >
                       {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((g) => (
-                        <option key={g} value={g}>
-                          {g}
-                        </option>
+                        <option key={g} value={g}>{g}</option>
                       ))}
                     </select>
                   </div>
                 </div>
-                <div className="flex gap-2 pt-2">
-                  <Button onClick={addMember} className="flex-1 bg-primary">
-                    {t("patient.family.addNewMember")}
-                  </Button>
-                  <Button variant="outline" onClick={() => setShowForm(false)} className="flex-1">
-                    {t("patient.family.cancel")}
-                  </Button>
+                <div className="flex gap-2 pt-1">
+                  <Button onClick={addMember} className="flex-1">{t("patient.family.addNewMember")}</Button>
+                  <Button variant="outline" onClick={() => setShowForm(false)} className="flex-1">{t("patient.family.cancel")}</Button>
                 </div>
               </CardContent>
             </Card>
@@ -282,34 +262,32 @@ export default function FamilyPage() {
 
           <div className="space-y-3">
             {members.map((m) => (
-              <Card key={m.id} className="hover:shadow-sm transition-shadow">
-                <CardContent className="p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold">
-                      <User className="h-5 w-5" />
+              <Card key={m.id}>
+                <CardContent className="flex items-center justify-between gap-3 p-4">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <User className="h-5 w-5" aria-hidden />
                     </div>
-                    <div>
-                      <p className="font-semibold text-sm">{m.name}</p>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">{m.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {m.relation} &bull; {m.age} {t("patient.family.years")} &bull; {m.gender}
+                        {m.relation} · {m.age} {t("patient.family.years")} · {m.gender}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="font-mono text-red-600 font-bold text-xs">
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="rounded-lg bg-danger-soft px-2 py-1 font-mono text-xs font-bold text-danger-soft-foreground">
                       {m.bloodGroup}
-                    </Badge>
-                    <Badge variant="secondary" className="text-xs">
-                      {t("common.active")}
-                    </Badge>
+                    </span>
                     {m.relation !== "Self" && (
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-muted-foreground hover:text-destructive"
                         onClick={() => removeMember(m.id)}
+                        aria-label={`${t("notifications.dismiss")}: ${m.name}`}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-4 w-4" aria-hidden />
                       </Button>
                     )}
                   </div>
@@ -323,118 +301,117 @@ export default function FamilyPage() {
       {/* TAB 2: Maternal ANC Care */}
       {activeTab === "maternal" && (
         <div className="space-y-4">
-          <Card className="border-rose-200 dark:border-rose-900 bg-rose-50/50 dark:bg-rose-950/20">
-            <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <Card className="border-rose-200/70 bg-rose-50/60 dark:border-rose-900/50 dark:bg-rose-950/20">
+            <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-900/50 flex items-center justify-center text-rose-600">
-                  <Heart className="h-5 w-5 fill-current" />
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-600 dark:bg-rose-900/50 dark:text-rose-400">
+                  <Heart className="h-5 w-5 fill-current" aria-hidden />
                 </div>
                 <div>
-                  <p className="font-bold text-sm text-foreground">Sunita Devi (Mother)</p>
+                  <p className="text-sm font-bold">Sunita Devi ({t("patient.family.mother")})</p>
                   <p className="text-xs text-muted-foreground">
-                    Gestational Age: <strong>26 Weeks</strong> &bull; Expected Delivery: <strong>Nov 2026</strong>
+                    {t("patient.family.gestationalAge")}: <strong>26</strong> · {t("patient.family.edd")}: <strong>Nov 2026</strong>
                   </p>
                 </div>
               </div>
-              <Badge className="bg-rose-600 text-white text-xs px-2.5 py-0.5">
-                PMMVY Registered
+              <Badge variant="outline" className="shrink-0 border-rose-300 bg-card text-rose-700 dark:border-rose-800 dark:text-rose-300">
+                {t("patient.family.pmmvy")}
               </Badge>
             </CardContent>
           </Card>
 
-          {/* Micronutrient Daily Course Tracker */}
+          {/* IFA daily course tracker */}
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <Pill className="h-4 w-4 text-primary" />
-                  Iron &amp; Folic Acid (IFA) 100-Day Course
-                </span>
-                <span className="font-mono text-xs text-muted-foreground">{ifaCount} / 100 Days</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
+            <CardContent className="space-y-3 p-5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="flex items-center gap-2 text-sm font-semibold">
+                  <Pill className="h-4 w-4 text-primary" aria-hidden />
+                  {t("patient.family.ifaTitle")}
+                </p>
+                <span className="font-mono text-xs text-muted-foreground">{ifaCount} / 100</span>
+              </div>
+              <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
                 <div
-                  className="bg-primary h-2.5 rounded-full transition-all duration-300"
+                  className="h-2.5 rounded-full bg-primary transition-all duration-300"
                   style={{ width: `${(ifaCount / 100) * 100}%` }}
+                  role="progressbar"
+                  aria-valuenow={ifaCount}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
                 />
               </div>
-              <div className="flex justify-between items-center text-xs text-muted-foreground pt-1">
-                <span>Daily 1 red IFA tablet prevents pregnancy anemia</span>
+              <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                <span>{t("patient.family.ifaNote")}</span>
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-7 text-xs"
+                  className="h-8 shrink-0 gap-1 text-xs"
                   onClick={() => setIfaCount((p) => Math.min(100, p + 1))}
                   disabled={ifaCount >= 100}
                 >
-                  <Check className="h-3 w-3 mr-1" /> Log Today&apos;s Tablet
+                  <Check className="h-3 w-3" aria-hidden /> {t("patient.family.logToday")}
                 </Button>
               </div>
             </CardContent>
           </Card>
 
-          {/* ANC Checkup Visits */}
+          {/* ANC visit schedule */}
           <div className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Antenatal Care (ANC) Visits Schedule
+              {t("patient.family.ancSchedule")}
             </p>
             {ancSchedule.map((anc) => (
-              <Card key={anc.id} className={anc.status === "due" ? "border-amber-400 dark:border-amber-700 shadow-sm" : ""}>
-                <CardContent className="p-4 space-y-2">
+              <Card key={anc.id} className={anc.status === "due" ? "border-warning-soft-foreground/30" : ""}>
+                <CardContent className="space-y-2 p-4">
                   <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-bold text-sm text-foreground">{anc.title}</p>
-                        <Badge
-                          variant={
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-bold">{anc.title}</p>
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold capitalize ${
                             anc.status === "completed"
-                              ? "success"
+                              ? "bg-success-soft text-success-soft-foreground"
                               : anc.status === "due"
-                              ? "warning"
-                              : "secondary"
-                          }
-                          className="text-[10px] capitalize"
+                              ? "bg-warning-soft text-warning-soft-foreground"
+                              : "bg-muted text-muted-foreground"
+                          }`}
                         >
                           {anc.status}
-                        </Badge>
+                        </span>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {anc.trimester} &bull; {anc.recommendedWeek}
-                        {anc.completedDate && ` &bull; Done on ${anc.completedDate}`}
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {anc.trimester} · {anc.recommendedWeek}
+                        {anc.completedDate && ` · ${t("patient.family.doneOn")} ${anc.completedDate}`}
                       </p>
                     </div>
 
                     <Button
                       size="sm"
                       variant={anc.status === "completed" ? "outline" : "default"}
-                      className={`text-xs h-8 ${anc.status === "due" ? "bg-amber-600 hover:bg-amber-700 text-white" : ""}`}
+                      className="h-8 shrink-0 text-xs"
                       onClick={() => toggleAncStatus(anc.id)}
                     >
                       {anc.status === "completed" ? (
                         <>
-                          <CheckCircle2 className="h-3.5 w-3.5 mr-1 text-emerald-600" /> Done
+                          <CheckCircle2 className="mr-1 h-3.5 w-3.5 text-success-soft-foreground" aria-hidden /> {t("patient.family.done")}
                         </>
                       ) : (
-                        "Mark Visited"
+                        t("patient.family.markVisited")
                       )}
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground bg-muted/40 p-2 rounded">
-                    {anc.details}
-                  </p>
+                  <p className="rounded-lg bg-muted/50 p-2.5 text-xs text-muted-foreground">{anc.details}</p>
                 </CardContent>
               </Card>
             ))}
           </div>
 
-          {/* High Risk Warning Signs Alert */}
-          <Alert className="bg-red-50 dark:bg-red-950/40 border-red-300 dark:border-red-900 text-red-900 dark:text-red-200">
-            <AlertTriangle className="h-5 w-5 text-red-600 shrink-0" />
-            <AlertDescription className="text-xs space-y-1">
-              <strong className="block font-semibold">Maternal Danger Signs (Seek Immediate Hospital Care):</strong>
-              <p>Severe headache with blurred vision, sudden swelling of face/hands, vaginal bleeding, high fever, or reduced baby movement.</p>
+          {/* High-risk warning signs */}
+          <Alert className="border-danger-soft-foreground/25 bg-danger-soft text-danger-soft-foreground">
+            <AlertTriangle className="h-5 w-5 shrink-0" aria-hidden />
+            <AlertDescription className="space-y-1 text-xs">
+              <strong className="block font-semibold">{t("patient.family.dangerSignsTitle")}</strong>
+              <p>{t("patient.family.dangerSignsBody")}</p>
             </AlertDescription>
           </Alert>
         </div>
@@ -443,58 +420,55 @@ export default function FamilyPage() {
       {/* TAB 3: Universal Child Immunization */}
       {activeTab === "child" && (
         <div className="space-y-4">
-          <Card className="border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/20">
-            <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <Card className="border-sky-200/70 bg-sky-50/60 dark:border-sky-900/50 dark:bg-sky-950/20">
+            <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600">
-                  <Baby className="h-5 w-5" />
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-900/50 dark:text-sky-400">
+                  <Baby className="h-5 w-5" aria-hidden />
                 </div>
                 <div>
-                  <p className="font-bold text-sm text-foreground">Baby Aarav Kumar</p>
+                  <p className="text-sm font-bold">{t("patient.family.childName")}</p>
                   <p className="text-xs text-muted-foreground">
-                    DOB: <strong>14 Dec 2023</strong> &bull; Universal Immunization Record (UIP)
+                    {t("patient.family.dob")}: <strong>14 Dec 2023</strong> · {t("patient.family.uip")}
                   </p>
                 </div>
               </div>
-              <Badge className="bg-blue-600 text-white text-xs px-2.5 py-0.5">
-                National Schedule
+              <Badge variant="outline" className="shrink-0 border-sky-300 bg-card text-sky-700 dark:border-sky-800 dark:text-sky-300">
+                {t("patient.family.nationalSchedule")}
               </Badge>
             </CardContent>
           </Card>
 
           <div className="space-y-3">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span className="font-semibold uppercase tracking-wider">Mandatory Vaccines</span>
-              <span>
-                {vaccines.filter((v) => v.status === "completed").length} of {vaccines.length} Administered
-              </span>
+              <span className="font-semibold uppercase tracking-wider">{t("patient.family.mandatory")}</span>
+              <span>{tf(t("patient.family.administeredOf"), { done: vaccines.filter((v) => v.status === "completed").length, total: vaccines.length })}</span>
             </div>
 
             {vaccines.map((v) => (
-              <Card key={v.id} className={v.status === "due" ? "border-primary shadow-sm" : ""}>
-                <CardContent className="p-3.5 flex items-center justify-between gap-3">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <p className="font-bold text-sm text-foreground">{v.vaccine}</p>
-                      <Badge
-                        variant={
+              <Card key={v.id} className={v.status === "due" ? "border-primary/40" : ""}>
+                <CardContent className="flex items-center justify-between gap-3 p-3.5">
+                  <div className="min-w-0 space-y-0.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-bold">{v.vaccine}</p>
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold capitalize ${
                           v.status === "completed"
-                            ? "success"
+                            ? "bg-success-soft text-success-soft-foreground"
                             : v.status === "due"
-                            ? "warning"
-                            : "secondary"
-                        }
-                        className="text-[10px] capitalize"
+                            ? "bg-warning-soft text-warning-soft-foreground"
+                            : "bg-muted text-muted-foreground"
+                        }`}
                       >
                         {v.status}
-                      </Badge>
+                      </span>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Target Age: <strong>{v.stage}</strong> &bull; Protects: {v.protectsAgainst}
+                      {t("patient.family.targetAge")}: <strong>{v.stage}</strong> · {t("patient.family.protects")}: {v.protectsAgainst}
                     </p>
                     {v.administeredDate && (
-                      <p className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                        <CheckCircle2 className="h-3 w-3" /> Given: {v.administeredDate}
+                      <p className="flex items-center gap-1 text-[11px] font-medium text-success-soft-foreground">
+                        <CheckCircle2 className="h-3 w-3" aria-hidden /> {t("patient.family.given")}: {v.administeredDate}
                       </p>
                     )}
                   </div>
@@ -502,15 +476,15 @@ export default function FamilyPage() {
                   <Button
                     size="sm"
                     variant={v.status === "completed" ? "outline" : "default"}
-                    className="text-xs h-8 shrink-0"
+                    className="h-8 shrink-0 text-xs"
                     onClick={() => toggleVaccine(v.id)}
                   >
                     {v.status === "completed" ? (
                       <>
-                        <ShieldCheck className="h-3.5 w-3.5 mr-1 text-emerald-600" /> Done
+                        <ShieldCheck className="mr-1 h-3.5 w-3.5 text-success-soft-foreground" aria-hidden /> {t("patient.family.done")}
                       </>
                     ) : (
-                      "Mark Given"
+                      t("patient.family.markGiven")
                     )}
                   </Button>
                 </CardContent>
@@ -522,4 +496,3 @@ export default function FamilyPage() {
     </div>
   );
 }
-

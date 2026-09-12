@@ -3,20 +3,22 @@ import Link from "next/link";
 import {usePathname} from "next/navigation";
 import {useAuthStore,useOfflineStore,useUIStore} from "@/stores";
 import {cn} from "@/lib/utils";
-import {Button} from "@/components/ui";
-import {Menu,X,User,LogOut,WifiOff,RefreshCw,Home,Stethoscope,Building2,Shield,Heart,ChevronDown,Sun,Moon,FileText,Activity} from "lucide-react";
+import {Button} from "@/components/ui";import{Menu,X,User,LogOut,WifiOff,RefreshCw,Home,Stethoscope,Building2,Heart,ChevronDown,Sun,Moon,FileText,Activity,Calendar,Droplet,Siren}from"lucide-react";
 import {useState,useSyncExternalStore}from"react";
 import {LanguageSelector}from"./LanguageSelector";
-import {NotificationBell}from"./NotificationBell";
-import {useTranslation}from"@/hooks/useTranslation";
+import {NotificationBell}from"./NotificationBell";import{useTranslation}from"@/hooks/useTranslation";
+import{useRouter}from"next/navigation";
 import type {UserRole}from"@/types";
 function useIsHydrated(){return useSyncExternalStore(()=>()=>{},()=>true,()=>false);}
 type NavItem={href:string;labelKey:string;icon:React.ComponentType<{className?:string}>};
 const navConfig:Record<UserRole,NavItem[]>={
   patient:[
     {href:"/patient/dashboard",labelKey:"common.dashboard",icon:Home},
-    {href:"/patient/triage",labelKey:"common.triage",icon:Stethoscope},
     {href:"/patient/hospitals",labelKey:"common.hospitals",icon:Building2},
+    {href:"/patient/opd",labelKey:"common.opd",icon:Calendar},
+    {href:"/patient/blood",labelKey:"common.blood",icon:Droplet},
+    {href:"/patient/emergency",labelKey:"common.emergency",icon:Siren},
+    {href:"/patient/triage",labelKey:"common.triage",icon:Stethoscope},
     {href:"/patient/family",labelKey:"common.family",icon:Heart}
   ],
   hospital_staff:[
@@ -38,6 +40,7 @@ const navConfig:Record<UserRole,NavItem[]>={
 };
 export function Header(){
   const pathname=usePathname();
+  const router=useRouter();
   const profile=useAuthStore(s=>s.profile);
   const isAuthenticated=useAuthStore(s=>s.isAuthenticated);
   const logout=useAuthStore(s=>s.logout);
@@ -126,7 +129,7 @@ export function Header(){
                       <User className="h-4 w-4" />
                       {t("common.profile")}
                     </Link>
-                    <button onClick={()=>{setProfileOpen(false);logout();}} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors w-full text-left text-destructive">
+                    <button onClick={async()=>{setProfileOpen(false);await logout();router.push("/login");}} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors w-full text-left text-destructive">
                       <LogOut className="h-4 w-4" />
                       {t("common.logout")}
                     </button>

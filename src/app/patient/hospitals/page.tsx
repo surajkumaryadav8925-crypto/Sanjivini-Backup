@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { Card, CardContent, Button, Input, Badge } from "@/components/ui";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -26,7 +26,10 @@ import {
   calculateDistance,
   type DistrictLocation,
   type HospitalTier,
+  type Hospital,
 } from "@/data/hospitals";
+import { useSupabaseData } from "@/lib/data/mode";
+import { fetchHospitals } from "@/lib/data/hospitals";
 import { useTranslation } from "@/hooks/useTranslation";
 
 type LocationStatus = "default" | "loading" | "granted" | "denied" | "error";
@@ -49,6 +52,33 @@ export default function HospitalsPage() {
   const [selectedDistrict, setSelectedDistrict] = useState<DistrictLocation>(BHAGALPUR_LOCATION);
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [locationStatus, setLocationStatus] = useState<LocationStatus>("default");
+
+  // --- Supabase-backed directory (production mode) ---
+  const useDb = useSupabaseData();
+  const [dbHospitals, setDbHospitals] = useState<Hospital[]>([]);
+  const [dbLoading, setDbLoading] = useState(useDb);
+  const [dbError, setDbError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!useDb) return;
+    let cancelled = false;
+    fetchHospitals({ district: districtFilter })
+      .then((rows) => {
+        if (!cancelled) {
+          setDbHospitals(rows);
+          setDbError(null);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setDbError(err instanceof Error ? err.message : "Failed to load hospitals");
+      })
+      .finally(() => {
+        if (!cancelled) setDbLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [useDb, districtFilter]);
 
   const handleUseCurrentLocation = useCallback(() => {
     if (!navigator.geolocation) {
@@ -94,8 +124,10 @@ export default function HospitalsPage() {
   const referenceLatitude = userLocation?.latitude ?? selectedDistrict.latitude;
   const referenceLongitude = userLocation?.longitude ?? selectedDistrict.longitude;
 
+  const source = useDb ? dbHospitals : demoHospitals;
+
   const hospitals = useMemo(() => {
-    return demoHospitals
+    return source
       .map((h) => ({
         ...h,
         distance: calculateDistance(referenceLatitude, referenceLongitude, h.latitude, h.longitude),
@@ -109,7 +141,7 @@ export default function HospitalsPage() {
         return true;
       })
       .sort((a, b) => (a.distance || 0) - (b.distance || 0));
-  }, [search, typeFilter, tierFilter, districtFilter, emergencyOnly, referenceLatitude, referenceLongitude]);
+  }, [source, search, typeFilter, tierFilter, emergencyOnly, referenceLatitude, referenceLongitude]);
 
   const isLocationLoading = locationStatus === "loading";
   const showLocationMessage = locationStatus === "denied" || locationStatus === "error";
@@ -255,29 +287,72 @@ export default function HospitalsPage() {
         </div>
       </div>
 
-      {/* Hospital Cards Grid */}
-      {hospitals.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="py-16 text-center">
-            <SlidersHorizontal className="h-10 w-10 mx-auto mb-3 text-muted-foreground opacity-50" />
-            <h3 className="text-base font-semibold text-foreground">No matching facilities found</h3>
-            <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
-              No healthcare centers match your current combination of filters in this district. Try selecting &quot;All 7 Districts&quot; or clearing your tier filters.
+      {/* Database status states (production mode) */}
+      {useDb && dbLoading && (
+        <Card className="border-dashed mb-4">
+          <CardContent className="py-12 text-center">
+            <Loader2 className="h-8 w-8 mx-auto mb-3 text-primary animate-spin" />
+            <p className="text-sm text-muted-foreground">Loading hospitals from the health network...</p>
+          </CardContent>
+        </Card>
+      )}
+      {useDb && dbError && (
+        <Card className="border-red-300 bg-red-50 dark:bg-red-950/20 mb-4">
+          <CardContent className="py-6 text-center space-y-3">
+            <p className="text-sm font-medium text-red-800 dark:text-red-300">
+              Could not load the hospital directory: {dbError}
             </p>
             <Button
               variant="outline"
               size="sm"
               onClick={() => {
-                setSearch("");
-                setTypeFilter("all");
-                setTierFilter("all");
-                setDistrictFilter("all");
-                setEmergencyOnly(false);
+                setDbLoading(true);
+                setDbError(null);
+                fetchHospitals({ district: districtFilter })
+                  .then((rows) => setDbHospitals(rows))
+                  .catch((err: unknown) => setDbError(err instanceof Error ? err.message : "Failed to load hospitals"))
+                  .finally(() => setDbLoading(false));
               }}
-              className="mt-4"
             >
-              Reset Filters
+              Try Again
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Hospital Cards Grid */}
+      {useDb && dbError ? null : hospitals.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="py-16 text-center">
+            <SlidersHorizontal className="h-10 w-10 mx-auto mb-3 text-muted-foreground opacity-50" />
+            <h3 className="text-base font-semibold text-foreground">
+              {useDb && dbLoading ? "Loading hospitals..." : "No matching facilities found"}
+            </h3>
+            <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+              {useDb && dbLoading
+                ? "Fetching the latest hospital directory from the health network."
+                : useDb && dbError
+                ? "Hospital data is unavailable right now. Please try again."
+                : useDb && !dbError
+                ? "No verified healthcare facilities match your current filters in this district."
+                : "No healthcare centers match your current combination of filters in this district. Try selecting \"All 7 Districts\" or clearing your tier filters."}
+            </p>
+            {!dbLoading && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearch("");
+                  setTypeFilter("all");
+                  setTierFilter("all");
+                  setDistrictFilter("all");
+                  setEmergencyOnly(false);
+                }}
+                className="mt-4"
+              >
+                Reset Filters
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (

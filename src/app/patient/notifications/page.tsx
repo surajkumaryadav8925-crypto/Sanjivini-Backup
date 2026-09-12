@@ -9,23 +9,23 @@ import { useTranslation } from "@/hooks/useTranslation";
 import type { NotificationType } from "@/data/notifications";
 
 const typeIcons: Record<NotificationType, React.ReactNode> = {
-  appointment: <Calendar className="h-5 w-5 text-blue-600" />,
-  medicine: <Pill className="h-5 w-5 text-purple-600" />,
-  follow_up: <Stethoscope className="h-5 w-5 text-teal-600" />,
-  diagnostic: <FlaskConical className="h-5 w-5 text-cyan-600" />,
-  referral: <FileText className="h-5 w-5 text-amber-600" />,
-  emergency: <AlertCircle className="h-5 w-5 text-red-600" />,
+  appointment: <Calendar className="h-5 w-5 text-primary" />,
+  medicine: <Pill className="h-5 w-5 text-primary" />,
+  follow_up: <Stethoscope className="h-5 w-5 text-primary" />,
+  diagnostic: <FlaskConical className="h-5 w-5 text-primary" />,
+  referral: <FileText className="h-5 w-5 text-warning-soft-foreground" />,
+  emergency: <AlertCircle className="h-5 w-5 text-danger-soft-foreground" />,
   general: <Info className="h-5 w-5 text-muted-foreground" />,
 };
 
 const typeBgColors: Record<NotificationType, string> = {
-  appointment: "bg-blue-100 dark:bg-blue-900/30",
-  medicine: "bg-purple-100 dark:bg-purple-900/30",
-  follow_up: "bg-teal-100 dark:bg-teal-900/30",
-  diagnostic: "bg-cyan-100 dark:bg-cyan-900/30",
-  referral: "bg-amber-100 dark:bg-amber-900/30",
-  emergency: "bg-red-100 dark:bg-red-900/30",
-  general: "bg-muted dark:bg-muted",
+  appointment: "bg-primary/10",
+  medicine: "bg-primary/10",
+  follow_up: "bg-primary/10",
+  diagnostic: "bg-primary/10",
+  referral: "bg-warning-soft",
+  emergency: "bg-danger-soft",
+  general: "bg-muted",
 };
 
 const priorityColors = {
@@ -86,10 +86,12 @@ export default function NotificationsPage() {
 
   return (
     <div className="container px-4 py-6 max-w-3xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Bell className="h-6 w-6" />
+          <h1 className="flex items-center gap-2.5 text-2xl font-bold tracking-tight sm:text-3xl">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Bell className="h-5 w-5" aria-hidden />
+            </span>
             {t("notifications.title")}
           </h1>
           <SpeakButton text={introText} />
@@ -124,10 +126,10 @@ export default function NotificationsPage() {
         </div>
       </div>
 
-      <Card className="mb-4 bg-blue-50 border-blue-200 dark:bg-blue-950/20">
+      <Card className="mb-4 border-primary/15 bg-primary/[0.04]">
         <CardContent className="flex items-center gap-3 py-3">
-          <Badge variant="default" className="bg-blue-500">{unreadCount}</Badge>
-          <p className="text-sm text-blue-800 dark:text-blue-200">
+          <Badge variant="default">{unreadCount}</Badge>
+          <p className="text-sm text-muted-foreground">
             {t("notifications.unreadCount")}
           </p>
         </CardContent>
@@ -150,7 +152,7 @@ export default function NotificationsPage() {
               key={notification.id}
               className={`transition-all ${
                 !notification.read
-                  ? "border-blue-200 bg-blue-50/50 dark:bg-blue-950/10"
+                  ? "border-primary/25 bg-primary/[0.03]"
                   : ""
               }`}
             >
@@ -190,9 +192,9 @@ export default function NotificationsPage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => markAsRead(notification.id)}
-                          className="gap-1 text-blue-600"
+                          className="gap-1 text-primary"
                         >
-                          <Check className="h-4 w-4" />
+                          <Check className="h-4 w-4" aria-hidden />
                           {t("notifications.markRead")}
                         </Button>
                       )}

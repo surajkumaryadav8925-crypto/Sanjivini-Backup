@@ -17,14 +17,83 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useTranslation } from "@/hooks/useTranslation";
-import { demoHospitals, DISTRICTS } from "@/data/hospitals";
+import { demoHospitals, DISTRICTS, type Hospital as UiHospital } from "@/data/hospitals";
+import { useSupabaseData } from "@/lib/data/mode";
+import { fetchHospitals } from "@/lib/data/hospitals";
+import { createEmergencyAlert, fetchMyEmergencyAlerts } from "@/lib/data/emergency";
+import { AlertCircle, Loader2 } from "lucide-react";
+import type { EmergencyAlert } from "@/types";
 
 export default function EmergencyPage() {
   const { t } = useTranslation();
+  const useDb = useSupabaseData();
   const [selectedDistrict, setSelectedDistrict] = useState<string>("Bhagalpur");
   const [geoCoords, setGeoCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
   const [sosSent, setSosSent] = useState(false);
+
+  // --- Live hospital directory (production mode) ---
+  const [dbHospitals, setDbHospitals] = useState<UiHospital[]>([]);
+  const [hospLoading, setHospLoading] = useState(useDb);
+  const [hospError, setHospError] = useState<string | null>(null);
+
+  // --- My persisted emergency alerts (production mode) ---
+  const [myAlerts, setMyAlerts] = useState<EmergencyAlert[]>([]);
+  const [sosSubmitting, setSosSubmitting] = useState(false);
+  const [sosError, setSosError] = useState<string | null>(null);
+
+  const loadAlerts = () => {
+    if (!useDb) return;
+    fetchMyEmergencyAlerts()
+      .then(setMyAlerts)
+      .catch(() => setMyAlerts([]));
+  };
+
+  useEffect(() => {
+    if (!useDb) return;
+    let cancelled = false;
+    fetchHospitals({ district: selectedDistrict })
+      .then((rows) => {
+        if (!cancelled) {
+          setDbHospitals(rows);
+          setHospError(null);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setHospError(err instanceof Error ? err.message : "Failed to load hospitals");
+      })
+      .finally(() => {
+        if (!cancelled) setHospLoading(false);
+      });
+    loadAlerts();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [useDb, selectedDistrict]);
+
+  // Record the SOS broadcast as a persisted emergency alert (production mode).
+  const handleSosBroadcast = async () => {
+    setSosSent(true);
+    if (!useDb) return;
+    setSosSubmitting(true);
+    setSosError(null);
+    try {
+      await createEmergencyAlert({
+        emergencyType: "sos_broadcast",
+        description: "Patient broadcast an SOS message via SMS/WhatsApp.",
+        locationLat: geoCoords?.lat ?? null,
+        locationLng: geoCoords?.lng ?? null,
+      });
+      loadAlerts();
+    } catch (err) {
+      setSosError(
+        err instanceof Error ? err.message : "Could not record the alert with the hospital network."
+      );
+    } finally {
+      setSosSubmitting(false);
+    }
+  };
 
   // Attempt to acquire coordinates for emergency dispatch
   useEffect(() => {
@@ -56,9 +125,11 @@ export default function EmergencyPage() {
     }
   };
 
-  const emergencyHospitals = demoHospitals.filter(
-    (h) => h.district === selectedDistrict && (h.emergencyAvailable || h.icuAvailable)
-  );
+  const emergencyHospitals: UiHospital[] = useDb
+    ? dbHospitals.filter((h) => h.emergencyAvailable || h.icuAvailable)
+    : demoHospitals.filter(
+        (h) => h.district === selectedDistrict && (h.emergencyAvailable || h.icuAvailable)
+      );
 
   const sosMessage = `EMERGENCY MEDICAL ALERT! I need immediate medical assistance. My coordinates: ${
     geoCoords ? `https://maps.google.com/?q=${geoCoords.lat.toFixed(5)},${geoCoords.lng.toFixed(5)}` : "Location pending"
@@ -109,11 +180,11 @@ export default function EmergencyPage() {
           <div className="flex flex-col sm:flex-row gap-2">
             <a
               href={`sms:?body=${encodeURIComponent(sosMessage)}`}
-              onClick={() => setSosSent(true)}
+              onClick={handleSosBroadcast}
               className="flex-1"
             >
               <Button className="w-full bg-red-600 hover:bg-red-700 text-white gap-2 font-bold h-11">
-                <Radio className="h-4 w-4" />
+                {sosSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Radio className="h-4 w-4" />}
                 Send SOS via SMS
               </Button>
             </a>
@@ -122,7 +193,7 @@ export default function EmergencyPage() {
               href={`https://wa.me/?text=${encodeURIComponent(sosMessage)}`}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={() => setSosSent(true)}
+              onClick={handleSosBroadcast}
               className="flex-1"
             >
               <Button variant="outline" className="w-full border-emerald-600 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 gap-2 font-bold h-11">
@@ -146,6 +217,31 @@ export default function EmergencyPage() {
             <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
               <CheckCircle2 className="h-3.5 w-3.5" /> Emergency dispatch message generated with live coordinates!
             </p>
+          )}
+          {sosError && (
+            <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1 font-medium">
+              <AlertCircle className="h-3.5 w-3.5" /> {sosError}
+            </p>
+          )}
+          {useDb && myAlerts.length > 0 && (
+            <div className="pt-2 border-t border-border space-y-1.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                My recent emergency alerts
+              </p>
+              {myAlerts.slice(0, 3).map((a) => (
+                <div key={a.id} className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">
+                    {new Date(a.created_at).toLocaleString()} &bull; {a.emergency_type.replace("_", " ")}
+                  </span>
+                  <Badge
+                    variant={a.status === "resolved" ? "success" : a.status === "reported" ? "warning" : "default"}
+                    className="capitalize text-[10px]"
+                  >
+                    {a.status}
+                  </Badge>
+                </div>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>
@@ -238,7 +334,17 @@ export default function EmergencyPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          {emergencyHospitals.length === 0 ? (
+          {useDb && hospLoading && (
+            <div className="py-6 text-center text-sm text-muted-foreground flex items-center justify-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading emergency facilities...
+            </div>
+          )}
+          {useDb && hospError && (
+            <div className="py-4 text-center text-sm text-red-600">
+              Could not load facilities: {hospError}
+            </div>
+          )}
+          {emergencyHospitals.length === 0 && !hospLoading && !hospError ? (
             <p className="text-sm text-muted-foreground py-6 text-center">
               No emergency facilities listed for this district.
             </p>

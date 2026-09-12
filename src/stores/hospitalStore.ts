@@ -89,6 +89,9 @@ const initialDepartments: OPDDepartment[] = [
   { id: 'cardiology', name: 'Cardiology', currentToken: 3, patients: [
     { id: 'p13', name: 'Madhav Iyer', token: 1, department: 'Cardiology', status: 'waiting', addedAt: new Date().toISOString() },
   ]},
+  { id: 'general-surgery', name: 'General Surgery', currentToken: 0, patients: [] },
+  { id: 'dermatology', name: 'Dermatology', currentToken: 0, patients: [] },
+  { id: 'eye-ent', name: 'Eye & ENT', currentToken: 0, patients: [] },
 ];
 
 export const useHospitalStore = create<HospitalState>()(
@@ -154,5 +157,14 @@ export const useHospitalStore = create<HospitalState>()(
     markPatientComplete: (departmentId, patientId) => set((state) => ({ departments: state.departments.map(dept => dept.id === departmentId ? { ...dept, patients: dept.patients.map(p => p.id === patientId ? { ...p, status: 'completed' } : p) } : dept) })),
     skipPatient: (departmentId, patientId) => set((state) => ({ departments: state.departments.map(dept => dept.id === departmentId ? { ...dept, patients: dept.patients.map(p => p.id === patientId ? { ...p, status: 'skipped' } : p) } : dept) })),
     removePatient: (departmentId, patientId) => set((state) => ({ departments: state.departments.map(dept => dept.id === departmentId ? { ...dept, patients: dept.patients.filter(p => p.id !== patientId) } : dept) })),
-  }), { name: 'hospital-storage' })
+  }), { name: 'hospital-storage', version: 1, migrate: (persisted, version) => {
+    // v1: added General Surgery / Dermatology / Eye & ENT departments after a
+    // duplicate-id fix — re-seed departments so demo bookings for them work
+    // even with a stale persisted store.
+    if (version < 1) {
+      const p = (persisted ?? {}) as Partial<HospitalState>;
+      return { ...p, departments: initialDepartments } as HospitalState;
+    }
+    return persisted as HospitalState;
+  } })
 );

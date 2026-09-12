@@ -1,11 +1,38 @@
-﻿"use client";
+"use client";
 import { useState, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Input } from "@/components/ui";
+import { Card, CardContent, Button, Input } from "@/components/ui";
 import { SpeakButton } from "@/components/ui/SpeakButton";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuthStore } from "@/stores";
-import { FileText, Calendar, Stethoscope, Pill, TestTube, Building2, ChevronDown, ChevronUp, Search, Shield, Check, X, AlertCircle, Clock, User } from "lucide-react";
-import { demoPatient, getPatientRecords, getPatientReports, getPatientAccess, MedicalRecord, DiagnosticReport } from "@/data/medicalRecords";
+import {
+  FileText, Calendar, Stethoscope, Pill, TestTube, ChevronDown, ChevronUp,
+  Search, ShieldCheck, Check, X, AlertCircle, User,
+} from "lucide-react";
+import { demoPatient, getPatientRecords, getPatientReports, getPatientAccess } from "@/data/medicalRecords";
+
+/** Soft status pill — matches the dashboard/Blood page language. */
+function StatusPill({ tone, children }: { tone: "success" | "warning" | "danger" | "neutral"; children: React.ReactNode }) {
+  const tones: Record<string, string> = {
+    success: "bg-success-soft text-success-soft-foreground",
+    warning: "bg-warning-soft text-warning-soft-foreground",
+    danger: "bg-danger-soft text-danger-soft-foreground",
+    neutral: "bg-muted text-muted-foreground",
+  };
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${tones[tone]}`}>
+      {children}
+    </span>
+  );
+}
+
+/** Teal icon tile — the recurring visual motif across the app. */
+function IconTile({ icon: Icon }: { icon: React.ComponentType<{ className?: string }> }) {
+  return (
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+      <Icon className="h-5 w-5" aria-hidden />
+    </div>
+  );
+}
 
 export default function PatientRecordsPage() {
   const { t } = useTranslation();
@@ -13,11 +40,13 @@ export default function PatientRecordsPage() {
   const [filter, setFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedRecord, setExpandedRecord] = useState<string | null>(null);
-  const [expandedReport, setExpandedReport] = useState<string | null>(null);
-  const [access, setAccess] = useState(getPatientAccess(profile?.id || "demo-user"));
+  // Authenticated users see their own records; unauthenticated demo viewers
+  // fall back to the showcase patient so the page is never empty in demo mode.
+  const recordsOwnerId = profile?.id || demoPatient.id;
+  const [access, setAccess] = useState(getPatientAccess(recordsOwnerId));
 
-  const records = getPatientRecords(profile?.id || "demo-user");
-  const reports = getPatientReports(profile?.id || "demo-user");
+  const records = getPatientRecords(recordsOwnerId);
+  const reports = getPatientReports(recordsOwnerId);
 
   const filteredRecords = useMemo(() => {
     let result = records;
@@ -26,7 +55,7 @@ export default function PatientRecordsPage() {
     if (filter === "diagnostics") result = result.filter(r => r.tests.length > 0);
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      result = result.filter(r => 
+      result = result.filter(r =>
         r.diagnosis.toLowerCase().includes(q) ||
         r.facilityName.toLowerCase().includes(q) ||
         r.doctor.toLowerCase().includes(q) ||
@@ -37,196 +66,259 @@ export default function PatientRecordsPage() {
   }, [records, filter, searchQuery]);
 
   const toggleAccess = (facilityId: string) => {
-    setAccess(prev => prev.map(a => 
+    setAccess(prev => prev.map(a =>
       a.facilityId === facilityId ? { ...a, accessGranted: !a.accessGranted } : a
     ));
   };
 
   const introText = t("records.title") + ". " + t("records.intro");
 
+  const filters: { key: string; label: string; icon?: React.ComponentType<{ className?: string }> }[] = [
+    { key: "all", label: t("records.all") },
+    { key: "consultations", label: t("records.consultations"), icon: Stethoscope },
+    { key: "prescriptions", label: t("records.prescriptions"), icon: Pill },
+    { key: "diagnostics", label: t("records.diagnostics"), icon: TestTube },
+  ];
+
   return (
-    <div className="container py-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold">{t("records.title")}</h1>
-          <SpeakButton text={introText} />
+    <div className="container px-4 py-6 max-w-4xl mx-auto space-y-6">
+      {/* Page header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{t("records.title")}</h1>
+          <p className="mt-1 text-sm text-muted-foreground sm:text-base">{t("records.intro")}</p>
         </div>
+        <SpeakButton text={introText} />
       </div>
 
-      {/* Patient Info Card */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg flex items-center gap-2"><User className="h-5 w-5" /> {demoPatient.name}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div><span className="text-muted-foreground">{t("records.age")}:</span> {demoPatient.age}</div>
-            <div><span className="text-muted-foreground">{t("records.gender")}:</span> {demoPatient.gender}</div>
-            <div><span className="text-muted-foreground">{t("records.bloodGroup")}:</span> {demoPatient.bloodGroup}</div>
-            <div><span className="text-muted-foreground">{t("records.emergencyContact")}:</span> {demoPatient.emergencyContact}</div>
-          </div>
-          {demoPatient.allergies.length > 0 && (
-            <div className="mt-3">
-              <span className="text-sm text-muted-foreground">{t("records.allergies")}: </span>
-              {demoPatient.allergies.map((a, i) => <Badge key={i} variant="destructive" className="mr-1">{a}</Badge>)}
-            </div>
-          )}
-          {demoPatient.chronicConditions.length > 0 && (
-            <div className="mt-2">
-              <span className="text-sm text-muted-foreground">{t("records.chronic")}: </span>
-              {demoPatient.chronicConditions.map((c, i) => <Badge key={i} variant="secondary" className="mr-1">{c}</Badge>)}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Search and Filter */}
-      <Card>
-        <CardContent className="pt-4">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder={t("records.search")}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              <Button size="sm" variant={filter === "all" ? "default" : "outline"} onClick={() => setFilter("all")}>{t("records.all")}</Button>
-              <Button size="sm" variant={filter === "consultations" ? "default" : "outline"} onClick={() => setFilter("consultations")}><Stethoscope className="h-4 w-4 mr-1" />{t("records.consultations")}</Button>
-              <Button size="sm" variant={filter === "prescriptions" ? "default" : "outline"} onClick={() => setFilter("prescriptions")}><Pill className="h-4 w-4 mr-1" />{t("records.prescriptions")}</Button>
-              <Button size="sm" variant={filter === "diagnostics" ? "default" : "outline"} onClick={() => setFilter("diagnostics")}><TestTube className="h-4 w-4 mr-1" />{t("records.diagnostics")}</Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Health Timeline */}
-      <div>
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Calendar className="h-5 w-5" /> {t("records.timeline")}
-          <SpeakButton text={filteredRecords.map(r => `${r.date}: ${r.diagnosis} at ${r.facilityName}`).join(". ")} />
-        </h2>
-        <div className="space-y-4">
-          {filteredRecords.length === 0 ? (
-            <Card><CardContent className="py-8 text-center text-muted-foreground">{t("records.noRecords")}</CardContent></Card>
-          ) : (
-            filteredRecords.map((record, index) => (
-              <Card key={record.id}>
-                <CardContent className="pt-4">
-                  <div className="flex items-start justify-between cursor-pointer" onClick={() => setExpandedRecord(expandedRecord === record.id ? null : record.id)}>
-                    <div className="flex items-start gap-3">
-                      <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                        <Stethoscope className="h-5 w-5 text-blue-600" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-medium">{record.diagnosis}</h3>
-                          <Badge variant="outline">{record.visitType}</Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground">{record.date} | {record.facilityName}</p>
-                        <p className="text-sm text-muted-foreground">{record.doctor} | {record.department}</p>
-                      </div>
-                    </div>
-                    {expandedRecord === record.id ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-                  </div>
-                  {expandedRecord === record.id && (
-                    <div className="mt-4 space-y-3 border-t pt-4">
-                      <div><span className="font-medium">{t("records.symptoms")}:</span> <span className="text-sm">{record.symptoms}</span></div>
-                      {record.prescription.length > 0 && (
-                        <div>
-                          <span className="font-medium">{t("records.prescription")}:</span>
-                          <div className="mt-1 space-y-1">
-                            {record.prescription.map((p, i) => (
-                              <div key={i} className="flex items-center gap-2 text-sm bg-muted p-2 rounded">
-                                <Pill className="h-4 w-4" />
-                                <span>{p.medicine}</span>
-                                <span className="text-muted-foreground">- {p.dosage}, {p.frequency}, {p.duration}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {record.tests.length > 0 && (
-                        <div>
-                          <span className="font-medium">{t("records.tests")}:</span>
-                          <div className="mt-1 space-y-1">
-                            {record.tests.map((test, i) => (
-                              <div key={i} className="flex items-center gap-2 text-sm">
-                                <TestTube className="h-4 w-4" />
-                                <span>{test.testName}</span>
-                                <Badge variant={test.status === "completed" ? "default" : "secondary"}>{test.status}</Badge>
-                                {test.result && <span className="text-muted-foreground">- {test.result}</span>}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {record.notes && <div><span className="font-medium">{t("records.notes")}:</span> <span className="text-sm">{record.notes}</span></div>}
-                      {record.followUpDate && <div><span className="font-medium">{t("records.followUp")}:</span> <span className="text-sm">{record.followUpDate}</span></div>}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* Diagnostic Reports */}
-      <div>
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <FileText className="h-5 w-5" /> {t("records.reports")}
-        </h2>
-        <div className="grid gap-3">
-          {reports.map((report) => (
-            <Card key={report.id}>
-              <CardContent className="pt-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <TestTube className="h-5 w-5 text-blue-600" />
-                    <div>
-                      <p className="font-medium">{report.testName}</p>
-                      <p className="text-sm text-muted-foreground">{report.date} | {report.facilityName}</p>
-                    </div>
-                  </div>
-                  <Badge variant={report.status === "completed" || report.status === "available" ? "default" : "secondary"}>
-                    {report.status}
-                  </Badge>
+      {/* Patient summary — quiet, factual, scannable */}
+      <Card className="border-primary/15 bg-primary/[0.03]">
+        <CardContent className="p-5">
+          <div className="flex items-start gap-4">
+            <IconTile icon={User} />
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold">{demoPatient.name}</p>
+              <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-4">
+                <div><span className="text-muted-foreground">{t("records.age")}:</span> <span className="font-medium">{demoPatient.age}</span></div>
+                <div><span className="text-muted-foreground">{t("records.gender")}:</span> <span className="font-medium">{demoPatient.gender}</span></div>
+                <div><span className="text-muted-foreground">{t("records.bloodGroup")}:</span> <span className="font-medium">{demoPatient.bloodGroup}</span></div>
+                <div><span className="text-muted-foreground">{t("records.emergencyContact")}:</span> <span className="font-medium">{demoPatient.emergencyContact}</span></div>
+              </div>
+              {demoPatient.allergies.length > 0 && (
+                <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground">{t("records.allergies")}:</span>
+                  {demoPatient.allergies.map((a, i) => <StatusPill key={i} tone="danger">{a}</StatusPill>)}
                 </div>
-                {report.result && <p className="mt-2 text-sm bg-muted p-2 rounded">{report.result}</p>}
-              </CardContent>
-            </Card>
+              )}
+              {demoPatient.chronicConditions.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground">{t("records.chronic")}:</span>
+                  {demoPatient.chronicConditions.map((c, i) => <StatusPill key={i} tone="warning">{c}</StatusPill>)}
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Search + filters */}
+      <div className="space-y-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder={t("records.search")}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+            aria-label={t("records.search")}
+          />
+        </div>
+        <div className="flex flex-wrap gap-2" role="group" aria-label={t("records.filter")}>
+          {filters.map(f => (
+            <button
+              key={f.key}
+              onClick={() => setFilter(f.key)}
+              className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-3.5 text-sm font-medium transition-colors ${
+                filter === f.key
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+              }`}
+            >
+              {f.icon && <f.icon className="h-3.5 w-3.5" aria-hidden />}
+              {f.label}
+            </button>
           ))}
         </div>
       </div>
 
-      {/* Record Sharing & Privacy */}
-      <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Shield className="h-5 w-5" /> {t("records.privacy")}
+      {/* Health timeline */}
+      <section>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+            <Calendar className="h-5 w-5 text-primary" aria-hidden /> {t("records.timeline")}
+          </h2>
+          <SpeakButton text={filteredRecords.map(r => `${r.date}: ${r.diagnosis} at ${r.facilityName}`).join(". ")} />
+        </div>
+        <div className="space-y-3">
+          {filteredRecords.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed py-12 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                <FileText className="h-6 w-6 text-muted-foreground" aria-hidden />
+              </div>
+              <p className="font-medium">{t("records.noRecords")}</p>
+              <p className="text-sm text-muted-foreground">{t("records.intro")}</p>
+            </div>
+          ) : (
+            filteredRecords.map((record) => {
+              const expanded = expandedRecord === record.id;
+              return (
+                <Card key={record.id} className="overflow-hidden">
+                  <CardContent className="p-0">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedRecord(expanded ? null : record.id)}
+                      aria-expanded={expanded}
+                      className="flex w-full items-start gap-4 p-5 text-left transition-colors hover:bg-muted/40"
+                    >
+                      <IconTile icon={Stethoscope} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-semibold">{record.diagnosis}</h3>
+                          <StatusPill tone="neutral">{record.visitType}</StatusPill>
+                        </div>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {record.date} · {record.facilityName}
+                        </p>
+                        <p className="text-sm text-muted-foreground">{record.doctor} · {record.department}</p>
+                      </div>
+                      <span className="mt-1 text-muted-foreground">
+                        {expanded ? <ChevronUp className="h-5 w-5" aria-hidden /> : <ChevronDown className="h-5 w-5" aria-hidden />}
+                      </span>
+                    </button>
+
+                    {expanded && (
+                      <div className="space-y-4 border-t px-5 py-4">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("records.symptoms")}</p>
+                          <p className="mt-1 text-sm">{record.symptoms}</p>
+                        </div>
+                        {record.prescription.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("records.prescription")}</p>
+                            <div className="mt-1.5 space-y-1.5">
+                              {record.prescription.map((p, i) => (
+                                <div key={i} className="flex items-start gap-2.5 rounded-lg bg-muted/60 p-2.5 text-sm">
+                                  <Pill className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+                                  <div>
+                                    <span className="font-medium">{p.medicine}</span>
+                                    <span className="text-muted-foreground"> — {p.dosage}, {p.frequency}, {p.duration}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {record.tests.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("records.tests")}</p>
+                            <div className="mt-1.5 space-y-1.5">
+                              {record.tests.map((test, i) => (
+                                <div key={i} className="flex flex-wrap items-center gap-2 text-sm">
+                                  <TestTube className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                                  <span className="font-medium">{test.testName}</span>
+                                  <StatusPill tone={test.status === "completed" ? "success" : "neutral"}>{test.status}</StatusPill>
+                                  {test.result && <span className="text-muted-foreground">— {test.result}</span>}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {record.notes && (
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("records.notes")}</p>
+                              <p className="mt-1 text-sm">{record.notes}</p>
+                            </div>
+                          )}
+                          {record.followUpDate && (
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("records.followUp")}</p>
+                              <p className="mt-1 text-sm font-medium">{record.followUpDate}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
+        </div>
+      </section>
+
+      {/* Diagnostic reports */}
+      {reports.length > 0 && (
+        <section>
+          <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold tracking-tight">
+            <FileText className="h-5 w-5 text-primary" aria-hidden /> {t("records.reports")}
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {reports.map((report) => (
+              <Card key={report.id}>
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <IconTile icon={TestTube} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-semibold leading-snug">{report.testName}</p>
+                        <StatusPill tone={report.status === "completed" || report.status === "available" ? "success" : "neutral"}>
+                          {report.status}
+                        </StatusPill>
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">{report.date} · {report.facilityName}</p>
+                      {report.result && <p className="mt-2 rounded-lg bg-muted/60 p-2.5 text-sm">{report.result}</p>}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Record sharing & privacy */}
+      <Card className="border-primary/20 bg-primary/[0.03]">
+        <CardContent className="p-5">
+          <div className="flex items-start justify-between gap-3">
+            <h2 className="flex items-center gap-2 font-semibold">
+              <ShieldCheck className="h-5 w-5 text-primary" aria-hidden /> {t("records.privacy")}
+            </h2>
             <SpeakButton text={t("records.privacyInfo")} />
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">{t("records.privacyInfo")}</p>
-          <div className="space-y-2">
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">{t("records.privacyInfo")}</p>
+          <div className="mt-4 space-y-2">
             {access.map((a) => (
-              <div key={a.facilityId} className="flex items-center justify-between p-2 bg-background dark:bg-black/40 rounded">
-                <div>
-                  <p className="font-medium text-sm">{a.facilityName}</p>
+              <div key={a.facilityId} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-card p-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold">{a.facilityName}</p>
                   <p className="text-xs text-muted-foreground">{a.facilityType}</p>
                 </div>
-                <Button size="sm" variant={a.accessGranted ? "default" : "outline"} onClick={() => toggleAccess(a.facilityId)}>
-                  {a.accessGranted ? <><Check className="h-4 w-4 mr-1" />{t("records.allowed")}</> : <><X className="h-4 w-4 mr-1" />{t("records.revoked")}</>}
+                <Button
+                  size="sm"
+                  variant={a.accessGranted ? "default" : "outline"}
+                  onClick={() => toggleAccess(a.facilityId)}
+                  aria-pressed={a.accessGranted}
+                  className="gap-1.5"
+                >
+                  {a.accessGranted ? <><Check className="h-3.5 w-3.5" aria-hidden />{t("records.allowed")}</> : <><X className="h-3.5 w-3.5" aria-hidden />{t("records.revoked")}</>}
                 </Button>
               </div>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground flex items-center gap-1"><AlertCircle className="h-3 w-3" />{t("records.demoConsent")}</p>
+          <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />{t("records.demoConsent")}
+          </p>
         </CardContent>
       </Card>
     </div>

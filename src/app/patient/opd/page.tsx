@@ -1,14 +1,17 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Label, Alert, AlertDescription, Badge } from "@/components/ui";
 import { SpeakButton } from "@/components/ui/SpeakButton";
-import { Calendar, Clock, User, Building2, CheckCircle, ArrowLeft, ArrowRight, Users } from "lucide-react";
+import { Calendar, Clock, User, Building2, CheckCircle, ArrowLeft, ArrowRight, Users, Loader2, AlertTriangle } from "lucide-react";
 import Link from "next/link";
-import { demoHospitals, DISTRICTS } from "@/data/hospitals";
+import { demoHospitals, DISTRICTS, type Hospital as UiHospital } from "@/data/hospitals";
 import { useHospitalStore } from "@/stores";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useSupabaseData } from "@/lib/data/mode";
+import { fetchHospitals } from "@/lib/data/hospitals";
+import { bookOpdToken, fetchMyBookings, type PatientBooking } from "@/lib/data/opd";
 
 const DEPARTMENTS = [
   { id: "general-med", name: "General Medicine" },
@@ -16,10 +19,21 @@ const DEPARTMENTS = [
   { id: "orthopedics", name: "Orthopedics" },
   { id: "gynecology", name: "Gynecology" },
   { id: "cardiology", name: "Cardiology" },
-  { id: "general-med", name: "General Surgery" },
-  { id: "general-med", name: "Dermatology" },
-  { id: "general-med", name: "Eye & ENT" },
+  { id: "general-surgery", name: "General Surgery" },
+  { id: "dermatology", name: "Dermatology" },
+  { id: "eye-ent", name: "Eye & ENT" },
 ];
+
+const DEPARTMENT_KEYS: Record<string, string> = {
+  "General Medicine": "patient.opd.dept.generalMed",
+  "Pediatrics": "patient.opd.dept.pediatrics",
+  "Orthopedics": "patient.opd.dept.orthopedics",
+  "Gynecology": "patient.opd.dept.gynecology",
+  "Cardiology": "patient.opd.dept.cardiology",
+  "General Surgery": "patient.opd.dept.generalSurgery",
+  "Dermatology": "patient.opd.dept.dermatology",
+  "Eye & ENT": "patient.opd.dept.eyeEnt",
+};
 
 const TIME_SLOTS = [
   "9:00 AM",
@@ -42,10 +56,38 @@ function OPDContent() {
   const preselectedHospital = searchParams.get("hospital");
 
   const { t } = useTranslation();
+  const useDb = useSupabaseData();
   const { addPatientToQueue, departments: storeDepartments } = useHospitalStore();
 
+  // --- Hospital directory (Supabase in production, fixtures in demo) ---
+  const [dbHospitals, setDbHospitals] = useState<UiHospital[]>([]);
+  const [dirLoading, setDirLoading] = useState(useDb);
+  const [dirError, setDirError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!useDb) return;
+    let cancelled = false;
+    fetchHospitals({ district: "all" })
+      .then((rows) => {
+        if (!cancelled) {
+          setDbHospitals(rows);
+          setDirError(null);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setDirError(err instanceof Error ? err.message : "Failed to load hospitals");
+      })
+      .finally(() => {
+        if (!cancelled) setDirLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [useDb]);
+
+  const allHospitals = useDb ? dbHospitals : demoHospitals;
+
   const matchedHosp = preselectedHospital
-    ? demoHospitals.find(
+    ? allHospitals.find(
         (h) =>
           h.name.toLowerCase().includes(preselectedHospital.toLowerCase()) ||
           h.id === preselectedHospital
@@ -62,9 +104,24 @@ function OPDContent() {
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState<number | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [bookedQueueId, setBookedQueueId] = useState<string | null>(null);
 
-  const selectedHospital = demoHospitals.find((h) => h.id === hospital);
-  const filteredHospitals = demoHospitals.filter(
+  // --- My bookings (production mode): live status panel above the wizard ---
+  const [bookings, setBookings] = useState<PatientBooking[] | null>(null);
+  const refreshBookings = () => {
+    if (!useDb) return;
+    fetchMyBookings()
+      .then(setBookings)
+      .catch(() => setBookings([]));
+  };
+  useEffect(() => {
+    refreshBookings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [useDb]);
+
+  const selectedHospital = allHospitals.find((h) => h.id === hospital);
+  const filteredHospitals = allHospitals.filter(
     (h) => selectedDistrict === "all" || h.district === selectedDistrict
   );
 
@@ -78,19 +135,33 @@ function OPDContent() {
   const handleSubmit = async () => {
     if (!hospital || !department || !slot || !patientName || !phone) return;
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 900));
+    setSubmitError(null);
 
-    // Connect with hospital OPD queue store
-    const targetDept = storeDepartments.find((d) => d.id === departmentId);
-    const calculatedToken = targetDept
-      ? (targetDept.patients.length > 0
-          ? Math.max(...targetDept.patients.map((p) => p.token))
-          : targetDept.currentToken) + 1
-      : Math.floor(10 + Math.random() * 50);
-
-    addPatientToQueue(departmentId, `${patientName} (${phone.slice(-4)})`);
-    setToken(calculatedToken);
-    setLoading(false);
+    try {
+      if (useDb) {
+        const result = await bookOpdToken({
+          hospitalId: hospital,
+          department,
+          slot,
+          patientName,
+          phone,
+        });
+        setToken(result.token_number);
+        setBookedQueueId(result.queue_id);
+        refreshBookings();
+      } else {
+        // Demo mode: keep the original in-store showcase behavior.
+        await new Promise((r) => setTimeout(r, 900));
+        addPatientToQueue(departmentId, `${patientName} (${phone.slice(-4)})`);
+        setToken(Math.floor(10 + Math.random() * 50));
+      }
+    } catch (err) {
+      setSubmitError(
+        err instanceof Error ? err.message : "Booking failed. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const reset = () => {
@@ -105,7 +176,9 @@ function OPDContent() {
   };
 
   if (token) {
-    const liveDept = storeDepartments.find((d) => d.id === departmentId);
+    const liveCounter = useDb
+      ? bookings?.find((b) => b.queue_id === bookedQueueId)?.current_token
+      : (storeDepartments as { id: string; currentToken: number }[]).find((d) => d.id === departmentId)?.currentToken;
     return (
       <div className="container px-4 py-8 max-w-md mx-auto text-center space-y-4">
         <div className="bg-emerald-100 dark:bg-emerald-950/40 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-2 border border-emerald-300 dark:border-emerald-800">
@@ -117,8 +190,7 @@ function OPDContent() {
         </p>
 
         <Card className="border-primary/30 shadow-lg">
-          <CardContent className="py-6 space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <CardContent className="py-6 space-y-3">              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {t("patient.opd.yourOdpToken")}
             </p>
             <p className="text-6xl font-black text-primary font-mono tracking-tight">#{token}</p>
@@ -128,21 +200,21 @@ function OPDContent() {
                 {selectedHospital?.name} • {department}
               </p>
               <p className="text-xs text-muted-foreground">
-                Scheduled Slot: <span className="font-medium text-foreground">{slot}</span>
+                {t("patient.opd.slotScheduled")}:{" "}<span className="font-medium text-foreground">{slot}</span>
               </p>
               <p className="text-xs text-muted-foreground">
-                Patient: <span className="font-medium text-foreground">{patientName}</span>
+                {t("patient.opd.patient")}:{" "}<span className="font-medium text-foreground">{patientName}</span>
               </p>
             </div>
 
-            {liveDept && (
-              <div className="mt-4 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-xs flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-blue-700 dark:text-blue-300 font-medium">
+            {liveCounter !== undefined && (
+              <div className="mt-4 p-3 rounded-lg bg-accent border border-primary/20 text-xs flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-accent-foreground font-medium">
                   <Users className="h-3.5 w-3.5" />
-                  Live Counter Status:
+                  {t("patient.opd.liveCounter")}:
                 </span>
-                <span className="font-bold text-blue-900 dark:text-blue-100">
-                  Serving #{liveDept.currentToken}
+                <span className="font-bold text-primary">
+                  {t("patient.opd.serving")} #{liveCounter}
                 </span>
               </div>
             )}
@@ -180,6 +252,62 @@ function OPDContent() {
         <SpeakButton text={instructions} />
       </div>
 
+      {useDb && submitError && (
+        <Alert className="mb-4 border-red-300 bg-red-50 dark:bg-red-950/30">
+          <AlertTriangle className="h-4 w-4 text-red-600" />
+          <AlertDescription className="text-sm text-red-800 dark:text-red-300">
+            {submitError}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {useDb && bookings && bookings.length > 0 && (
+        <Card className="mb-6 border-primary/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-success" />
+              {t("patient.opd.myBookings")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {bookings.slice(0, 3).map((b) => (
+              <div
+                key={b.token_id}
+                className="flex items-center justify-between p-3 rounded-lg border bg-muted/30 text-sm"
+              >
+                <div>
+                  <p className="font-medium">
+                    #{b.token_number} &bull; {b.department}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {b.hospital_name} &bull; Booked {new Date(b.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <Badge
+                    variant={
+                      b.status === "waiting"
+                        ? "secondary"
+                        : b.status === "called"
+                        ? "default"
+                        : "outline"
+                    }
+                    className="text-xs capitalize"
+                  >
+                    {b.status}
+                  </Badge>
+                  {b.status !== "completed" && (
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      {t("patient.opd.nowServing")} #{b.current_token}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
         <span>
           {t("patient.opd.step")} {step} {t("patient.opd.of")} 4
@@ -215,7 +343,7 @@ function OPDContent() {
                 onClick={() => setSelectedDistrict("all")}
                 className="text-xs h-7 flex-shrink-0"
               >
-                All Districts
+                {t("patient.opd.allDistricts")}
               </Button>
               {DISTRICTS.map((d) => (
                 <Button
@@ -230,6 +358,21 @@ function OPDContent() {
               ))}
             </div>
 
+            {dirLoading && (
+              <div className="py-6 text-center text-sm text-muted-foreground flex items-center justify-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" /> {t("patient.opd.loadingHospitals")}
+              </div>
+            )}
+            {dirError && !dirLoading && (
+              <div className="py-4 text-center text-sm text-destructive">
+                {t("patient.opd.loadError")}: {dirError}
+              </div>
+            )}
+            {!dirLoading && !dirError && filteredHospitals.length === 0 && (
+              <div className="py-6 text-center text-sm text-muted-foreground">
+                {t("patient.opd.noHospitalsDistrict")}
+              </div>
+            )}
             <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
               {filteredHospitals.map((h) => (
                 <button
@@ -275,12 +418,12 @@ function OPDContent() {
             <div className="grid grid-cols-2 gap-2.5">
               {DEPARTMENTS.map((d) => (
                 <Button
-                  key={d.name}
+                  key={d.id}
                   variant={department === d.name ? "default" : "outline"}
                   onClick={() => handleSelectDept(d)}
                   className="h-12 text-xs font-medium justify-start px-3"
                 >
-                  {d.name}
+                  {t(DEPARTMENT_KEYS[d.name] ?? "") || d.name}
                 </Button>
               ))}
             </div>
@@ -381,12 +524,23 @@ function OPDContent() {
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 {t("common.back")}
               </Button>
+              {submitError && (
+                <p className="text-xs text-red-600 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-lg p-2.5">
+                  {submitError}
+                </p>
+              )}
               <Button
                 onClick={handleSubmit}
                 disabled={!patientName || !phone || loading}
                 className="flex-1"
               >
-                {loading ? "Booking Token..." : t("patient.opd.bookToken")}
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Booking Token...
+                  </span>
+                ) : (
+                  t("patient.opd.bookToken")
+                )}
               </Button>
             </div>
           </CardContent>

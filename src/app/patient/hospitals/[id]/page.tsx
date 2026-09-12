@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Alert, AlertDescription } from "@/components/ui";
@@ -18,12 +18,65 @@ import {
   Droplet,
   Shield,
 } from "lucide-react";
-import { demoHospitals, DISTRICTS, calculateDistance } from "@/data/hospitals";
+import { demoHospitals, DISTRICTS, calculateDistance, type Hospital as UiHospital } from "@/data/hospitals";
+import { Loader2 } from "lucide-react";
+import { useSupabaseData } from "@/lib/data/mode";
+import { fetchHospitalDetail } from "@/lib/data/hospitals";
 
 export default function HospitalDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const hospital = demoHospitals.find((h) => h.id === id);
+  const useDb = useSupabaseData();
+
+  const [dbHospital, setDbHospital] = useState<UiHospital | null>(null);
+  const [dbLoading, setDbLoading] = useState(useDb);
+  const [dbError, setDbError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!useDb) return;
+    let cancelled = false;
+    fetchHospitalDetail(id)
+      .then((h) => {
+        if (!cancelled) {
+          setDbHospital(h);
+          setDbError(null);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setDbError(err instanceof Error ? err.message : "Failed to load hospital");
+      })
+      .finally(() => {
+        if (!cancelled) setDbLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [useDb, id]);
+
+  const hospital: UiHospital | undefined = useDb
+    ? (dbHospital ?? undefined)
+    : demoHospitals.find((h) => h.id === id);
+
+  if (useDb && dbLoading) {
+    return (
+      <div className="container px-4 py-16 text-center">
+        <Loader2 className="h-8 w-8 mx-auto mb-3 text-primary animate-spin" />
+        <p className="text-sm text-muted-foreground">Loading hospital details...</p>
+      </div>
+    );
+  }
+
+  if (useDb && dbError) {
+    return (
+      <div className="container px-4 py-16 text-center">
+        <h1 className="text-2xl font-bold mb-3">Could not load hospital</h1>
+        <p className="text-sm text-muted-foreground mb-6">{dbError}</p>
+        <Link href="/patient/hospitals">
+          <Button>Back to Directory</Button>
+        </Link>
+      </div>
+    );
+  }
 
   if (!hospital) {
     return (

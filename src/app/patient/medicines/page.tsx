@@ -39,10 +39,15 @@ export default function MedicinesPage() {
 
   return (
     <div className="container px-4 py-6 max-w-6xl mx-auto">
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">{t("medicines.medicineDesk")}<Pill className="h-5 w-5 text-blue-500" /></h1>
-          <p className="text-sm text-muted-foreground">{BHAGALPUR_LOCATION.name}, {BHAGALPUR_LOCATION.state}</p>
+          <h1 className="flex items-center gap-2.5 text-2xl font-bold tracking-tight sm:text-3xl">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Pill className="h-5 w-5" aria-hidden />
+            </span>
+            {t("medicines.medicineDesk")}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground sm:text-base">{t("medicines.intro")} · {BHAGALPUR_LOCATION.name}, {BHAGALPUR_LOCATION.state}</p>
         </div>
         <SpeakButton text={introText} />
       </div>
@@ -57,19 +62,19 @@ export default function MedicinesPage() {
         />
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-6">
-        <select value={availabilityFilter} onChange={e => setAvailabilityFilter(e.target.value)} className="text-sm border rounded px-2 py-1.5">
+      <div className="mb-6 flex flex-wrap gap-2">
+        <select aria-label={t("medicines.allAvailability")} value={availabilityFilter} onChange={e => setAvailabilityFilter(e.target.value)} className="min-h-[38px] rounded-lg border bg-background px-3 text-sm">
           <option value="all">{t("medicines.allAvailability")}</option>
           <option value="available">{t("common.available")}</option>
           <option value="low_stock">{t("medicines.lowStock")}</option>
           <option value="out_of_stock">{t("common.unavailable")}</option>
         </select>
-        <select value={facilityFilter} onChange={e => setFacilityFilter(e.target.value)} className="text-sm border rounded px-2 py-1.5">
+        <select aria-label={t("medicines.allFacilities")} value={facilityFilter} onChange={e => setFacilityFilter(e.target.value)} className="min-h-[38px] rounded-lg border bg-background px-3 text-sm">
           <option value="all">{t("medicines.allFacilities")}</option>
           <option value="government">{t("patient.hospitals.government")}</option>
           <option value="private">{t("patient.hospitals.private")}</option>
         </select>
-        <select value={distanceFilter} onChange={e => setDistanceFilter(Number(e.target.value))} className="text-sm border rounded px-2 py-1.5">
+        <select aria-label={t("medicines.within50km")} value={distanceFilter} onChange={e => setDistanceFilter(Number(e.target.value))} className="min-h-[38px] rounded-lg border bg-background px-3 text-sm">
           <option value="10">{t("medicines.within10km")}</option>
           <option value="25">{t("medicines.within25km")}</option>
           <option value="50">{t("medicines.within50km")}</option>
@@ -81,8 +86,8 @@ export default function MedicinesPage() {
           <CardContent className="p-4">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-start gap-3">
-                <div className="h-12 w-12 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
-                  <Pill className="h-6 w-6 text-blue-600" />
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                  <Pill className="h-6 w-6 text-primary" aria-hidden />
                 </div>
                 <div>
                   <h2 className="font-semibold text-lg">{selectedMedData.name}</h2>
@@ -137,8 +142,8 @@ export default function MedicinesPage() {
           <Card key={med.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setSelectedMedicine(med.id)}>
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
-                  <Pill className="h-5 w-5 text-blue-600" />
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                  <Pill className="h-5 w-5 text-primary" aria-hidden />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-sm truncate">{med.name}</h3>
@@ -150,7 +155,15 @@ export default function MedicinesPage() {
           </Card>
         ))}
       </div>
-      {medicines.length === 0 && <Card><CardContent className="py-12 text-center text-muted-foreground">{t("common.noResults")}</CardContent></Card>}
+      {medicines.length === 0 && (
+        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed py-12 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+            <Pill className="h-6 w-6 text-muted-foreground" aria-hidden />
+          </div>
+          <p className="font-medium">{t("medicines.noResults")}</p>
+          <p className="text-sm text-muted-foreground">{t("medicines.searchPlaceholder")}</p>
+        </div>
+      )}
     </div>
   );
 }

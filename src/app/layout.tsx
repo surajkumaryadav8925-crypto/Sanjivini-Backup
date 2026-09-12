@@ -2,7 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/lib/providers";
-import { Header, SyncStatusBanner } from "@/components/layout";
+import { AuthBootstrap } from "@/components/providers/AuthBootstrap";
+import { Header, SyncStatusBanner, PatientBottomNav } from "@/components/layout";
 import { Toaster } from "@/components/ui";
 import { VoiceAssistant } from "@/components/voice/VoiceAssistant";
 import { AIHealthCall } from "@/components/voice/AIHealthCall";
@@ -50,12 +51,15 @@ export default function RootLayout({
       </head>
       <body className={inter.className}>
         <Providers>
-          <Header />
-          <main className="min-h-screen pb-32">{children}</main>
-          <SyncStatusBanner />
-          <Toaster />
-          <VoiceAssistant />
-          <AIHealthCall />
+          <AuthBootstrap>
+            <Header />
+            <main className="min-h-screen pb-32">{children}</main>
+            <PatientBottomNav />
+            <SyncStatusBanner />
+            <Toaster />
+            <VoiceAssistant />
+            <AIHealthCall />
+          </AuthBootstrap>
         </Providers>
       </body>
     </html>

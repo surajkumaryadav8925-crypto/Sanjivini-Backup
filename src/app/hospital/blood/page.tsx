@@ -1,32 +1,106 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Input } from "@/components/ui";
 import { useHospitalStore } from "@/stores";
-import { Droplet, Plus, Minus, Edit2, AlertTriangle, CheckCircle, Clock, Check, X } from "lucide-react";
+import { useSupabaseData } from "@/lib/data/mode";
+import { getMyStaffHospital } from "@/lib/data/staff";
+import {
+  fetchBloodInventory,
+  updateBloodInventory,
+  fetchBloodRequests,
+  setBloodRequestStatus,
+  type BloodInventoryRow,
+  type BloodRequestRow,
+} from "@/lib/data/blood";
+import { Droplet, Plus, Minus, Edit2, AlertTriangle, CheckCircle, Clock, Check, X, Loader2, RefreshCw } from "lucide-react";
+
+interface UiBloodGroup { group: string; available: number; reserved: number; }
+const ALL_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 export default function BloodBankPage() {
-  const { bloodGroups, updateBloodGroup, bloodRequests, updateBloodRequestStatus } = useHospitalStore();
+  const useDb = useSupabaseData();
+  const { bloodGroups: demoGroups, updateBloodGroup, bloodRequests: demoRequests, updateBloodRequestStatus } = useHospitalStore();
+
   const [activeTab, setActiveTab] = useState<"inventory" | "requests">("inventory");
   const [editGroup, setEditGroup] = useState<string | null>(null);
   const [editData, setEditData] = useState<{ available: number; reserved: number }>({ available: 0, reserved: 0 });
   const [requestFilter, setRequestFilter] = useState<string>("all");
+  const [saving, setSaving] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const totalUnits = bloodGroups.reduce((sum, bg) => sum + bg.available + bg.reserved, 0);
-  const totalAvailable = bloodGroups.reduce((sum, bg) => sum + bg.available, 0);
-  const totalReserved = bloodGroups.reduce((sum, bg) => sum + bg.reserved, 0);
-  const criticalGroups = bloodGroups.filter(bg => bg.available < 5);
-  const pendingRequestsCount = bloodRequests.filter(r => r.status === "pending").length;
+  // --- Live data (production mode) ---
+  const [liveGroups, setLiveGroups] = useState<UiBloodGroup[]>([]);
+  const [liveRequests, setLiveRequests] = useState<BloodRequestRow[]>([]);
+  const [loading, setLoading] = useState(useDb);
+  const [error, setError] = useState<string | null>(null);
 
-  const openEdit = (bg: typeof bloodGroups[0]) => {
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const staff = await getMyStaffHospital();
+      if (!staff) {
+        setError("No hospital is linked to your staff account. Contact your administrator.");
+        setLiveGroups([]);
+        setLiveRequests([]);
+        return;
+      }
+      const [inv, reqs] = await Promise.all([
+        fetchBloodInventory(staff.hospitalId),
+        fetchBloodRequests(staff.hospitalId),
+      ]);
+      const byGroup = new Map(inv.map((row) => [row.blood_group, row]));
+      setLiveGroups(
+        ALL_GROUPS.map((g) => {
+          const row = byGroup.get(g);
+          return { group: g, available: row?.units_available ?? 0, reserved: row?.units_reserved ?? 0 };
+        })
+      );
+      setLiveRequests(reqs);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load blood bank data");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!useDb) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) void load();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [useDb, load]);
+
+  const bloodGroups: UiBloodGroup[] = useDb ? liveGroups : demoGroups;
+
+  const openEdit = (bg: UiBloodGroup) => {
     setEditGroup(bg.group);
     setEditData({ available: bg.available, reserved: bg.reserved });
   };
 
-  const saveEdit = () => {
-    if (editGroup) {
-      updateBloodGroup(editGroup, "available", editData.available);
-      updateBloodGroup(editGroup, "reserved", editData.reserved);
+  const saveEdit = async () => {
+    if (!editGroup) return;
+    setSaving(true);
+    setActionError(null);
+    try {
+      if (useDb) {
+        const staff = await getMyStaffHospital();
+        if (!staff) throw new Error("Not authorized");
+        await updateBloodInventory(staff.hospitalId, editGroup, editData.available, editData.reserved);
+        setLiveGroups((prev) => prev.map((g) => (g.group === editGroup ? { ...g, available: editData.available, reserved: editData.reserved } : g)));
+      } else {
+        updateBloodGroup(editGroup, "available", editData.available);
+        updateBloodGroup(editGroup, "reserved", editData.reserved);
+      }
       setEditGroup(null);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not save inventory");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -34,7 +108,30 @@ export default function BloodBankPage() {
     setEditData(prev => ({ ...prev, [field]: Math.max(0, prev[field] + delta) }));
   };
 
-  const filteredRequests = bloodRequests.filter(r => {
+  const handleRequestAction = async (reqId: string, action: "approve" | "reject" | "fulfill") => {
+    setSaving(true);
+    setActionError(null);
+    try {
+      await setBloodRequestStatus(reqId, action);
+      await load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Action failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const requests = useDb
+    ? liveRequests.map((r) => ({ ...r, hospitalName: r.hospital_name ?? "" }))
+    : demoRequests.map((r) => ({ ...r, hospital_name: r.hospitalName, contact_phone: r.contactPhone, patient_name: r.patientName, created_at: r.requestedAt, blood_group: r.bloodGroup, hospitalName: r.hospitalName }));
+
+  const totalUnits = bloodGroups.reduce((sum, bg) => sum + bg.available + bg.reserved, 0);
+  const totalAvailable = bloodGroups.reduce((sum, bg) => sum + bg.available, 0);
+  const totalReserved = bloodGroups.reduce((sum, bg) => sum + bg.reserved, 0);
+  const criticalGroups = bloodGroups.filter(bg => bg.available < 5);
+  const pendingRequestsCount = requests.filter(r => r.status === "pending").length;
+
+  const filteredRequests = requests.filter(r => {
     if (requestFilter === "all") return true;
     return r.status === requestFilter;
   });
@@ -51,30 +148,56 @@ export default function BloodBankPage() {
             Real-time blood stock control, hospital reservations, and patient requisitions
           </p>
         </div>
-        <div className="flex bg-muted p-1 rounded-lg">
-          <Button
-            variant={activeTab === "inventory" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setActiveTab("inventory")}
-            className="text-xs"
-          >
-            Inventory Units
-          </Button>
-          <Button
-            variant={activeTab === "requests" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setActiveTab("requests")}
-            className="text-xs relative"
-          >
-            Requisitions
-            {pendingRequestsCount > 0 && (
-              <Badge className="ml-1.5 h-5 px-1.5 bg-red-500 text-white text-[10px]">
-                {pendingRequestsCount}
-              </Badge>
-            )}
-          </Button>
+        <div className="flex items-center gap-2">
+          {useDb && (
+            <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading} className="gap-2">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              Refresh
+            </Button>
+          )}
+          <div className="flex bg-muted p-1 rounded-lg">
+            <Button
+              variant={activeTab === "inventory" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setActiveTab("inventory")}
+              className="text-xs"
+            >
+              Inventory Units
+            </Button>
+            <Button
+              variant={activeTab === "requests" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setActiveTab("requests")}
+              className="text-xs relative"
+            >
+              Requisitions
+              {pendingRequestsCount > 0 && (
+                <Badge className="ml-1.5 h-5 px-1.5 bg-red-500 text-white text-[10px]">
+                  {pendingRequestsCount}
+                </Badge>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
+
+      {useDb && error && (
+        <Card className="border-red-300 bg-red-50 dark:bg-red-950/20">
+          <CardContent className="py-4 text-center space-y-2">
+            <p className="text-sm font-medium text-red-800 dark:text-red-300">{error}</p>
+            <Button variant="outline" size="sm" onClick={() => void load()}>Try Again</Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {actionError && (
+        <Card className="border-amber-300 bg-amber-50 dark:bg-amber-950/20">
+          <CardContent className="py-3 flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-300">{actionError}</p>
+          </CardContent>
+        </Card>
+      )}
 
       {criticalGroups.length > 0 && (
         <Card className="border-red-300 bg-red-50 dark:bg-red-950/20">
@@ -181,9 +304,9 @@ export default function BloodBankPage() {
                   <div key={req.id} className="py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-sm">{req.id}</span>
+                        <span className="font-mono font-bold text-xs text-muted-foreground">{req.id.slice(0, 8)}</span>
                         <Badge variant="outline" className="font-bold text-red-600">
-                          {req.bloodGroup} • {req.units} {req.units > 1 ? "units" : "unit"}
+                          {req.blood_group} • {req.units} {req.units > 1 ? "units" : "unit"}
                         </Badge>
                         <Badge
                           variant={
@@ -213,10 +336,10 @@ export default function BloodBankPage() {
                         </Badge>
                       </div>
                       <p className="text-sm font-medium">
-                        Patient: {req.patientName} &bull; Attendant Phone: {req.contactPhone}
+                        Patient: {req.patient_name} &bull; Attendant Phone: {req.contact_phone}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Requested: {new Date(req.requestedAt).toLocaleString()} &bull; Target: {req.hospitalName}
+                        Requested: {new Date(req.created_at).toLocaleString()} &bull; Target: {req.hospitalName}
                       </p>
                     </div>
 
@@ -226,7 +349,8 @@ export default function BloodBankPage() {
                           <Button
                             size="sm"
                             className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1 text-xs"
-                            onClick={() => updateBloodRequestStatus(req.id, "approved")}
+                            disabled={saving}
+                            onClick={() => void handleRequestAction(req.id, "approve")}
                           >
                             <Check className="h-3.5 w-3.5" />
                             Approve & Reserve
@@ -235,7 +359,8 @@ export default function BloodBankPage() {
                             size="sm"
                             variant="destructive"
                             className="gap-1 text-xs"
-                            onClick={() => updateBloodRequestStatus(req.id, "rejected")}
+                            disabled={saving}
+                            onClick={() => void handleRequestAction(req.id, "reject")}
                           >
                             <X className="h-3.5 w-3.5" />
                             Reject
@@ -246,7 +371,8 @@ export default function BloodBankPage() {
                         <Button
                           size="sm"
                           className="bg-blue-600 hover:bg-blue-700 text-white gap-1 text-xs"
-                          onClick={() => updateBloodRequestStatus(req.id, "fulfilled")}
+                          disabled={saving}
+                          onClick={() => void handleRequestAction(req.id, "fulfill")}
                         >
                           <CheckCircle className="h-3.5 w-3.5" />
                           Mark Dispensed
@@ -315,7 +441,9 @@ export default function BloodBankPage() {
             </div>
             <div className="flex justify-end gap-2 mt-6">
               <Button variant="outline" onClick={() => setEditGroup(null)}>Cancel</Button>
-              <Button onClick={saveEdit} className="bg-primary">Save Changes</Button>
+              <Button onClick={() => void saveEdit()} disabled={saving} className="bg-primary">
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Changes"}
+              </Button>
             </div>
           </div>
         </div>
@@ -323,4 +451,3 @@ export default function BloodBankPage() {
     </div>
   );
 }
-

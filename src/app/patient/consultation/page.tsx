@@ -1,10 +1,9 @@
 "use client";
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Card, CardContent, Button, Badge, Input } from "@/components/ui";
 import { SpeakButton } from "@/components/ui/SpeakButton";
-import { Video, Search, Star, Clock, Award, Globe, Calendar, CheckCircle, XCircle, Phone, Filter } from "lucide-react";
+import { Video, Search, Star, Clock, Award, Globe, Calendar, CheckCircle, Filter } from "lucide-react";
 import { useConsultationStore } from "@/stores";
 import { useTranslation } from "@/hooks/useTranslation";
 import { demoDoctors, availableTimeSlots, specializationLabels } from "@/data/doctors";
@@ -27,14 +26,13 @@ function formatDate(date: Date): string {
 }
 
 export default function ConsultationPage() {
-  const router = useRouter();
   const { t } = useTranslation();
   const { bookConsultation, getUpcomingConsultations, getCompletedConsultations } = useConsultationStore();
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState("");
   const [specializationFilter, setSpecializationFilter] = useState<Specialization | "all">("all");
-  const [availabilityFilter, setAvailabilityFilter] = useState<"all" | "available">("all");
+  const [availabilityFilter] = useState<"all" | "available">("all");
 
   // Booking flow states
   const [bookingStep, setBookingStep] = useState<"select" | "schedule" | "confirm" | "success">("select");
@@ -132,8 +130,8 @@ export default function ConsultationPage() {
         <Card className="mb-6">
           <CardContent className="p-4">
             <div className="flex items-center gap-4">
-              <div className="h-16 w-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                <span className="text-lg font-bold text-blue-600">{selectedDoctor.imageInitials}</span>
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                <span className="text-lg font-bold text-primary">{selectedDoctor.imageInitials}</span>
               </div>
               <div>
                 <h3 className="font-semibold">{selectedDoctor.name}</h3>
@@ -206,7 +204,7 @@ export default function ConsultationPage() {
 
         {selectedSlot && (
           <div className="mb-6">
-            <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200">
+            <Card className="border-primary/15 bg-primary/[0.04]">
               <CardContent className="p-4">
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">{t("consultation.consultationFee")}</span>
@@ -233,8 +231,8 @@ export default function ConsultationPage() {
       <div className="container px-4 py-6 max-w-3xl mx-auto">
         <Card className="text-center py-8">
           <CardContent>
-            <div className="h-16 w-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="h-8 w-8 text-green-600" />
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-success-soft">
+              <CheckCircle className="h-8 w-8 text-success-soft-foreground" aria-hidden />
             </div>
             <h1 className="text-2xl font-bold mb-2">{t("consultation.bookingSuccess")}</h1>
             <p className="text-muted-foreground mb-6">{t("consultation.bookingSuccessDesc")}</p>
@@ -242,8 +240,8 @@ export default function ConsultationPage() {
             {selectedDoctor && selectedDate && selectedSlot && (
               <div className="bg-muted/50 rounded-lg p-4 mb-6 text-left">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                    <span className="text-sm font-bold text-blue-600">{selectedDoctor.imageInitials}</span>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                    <span className="text-sm font-bold text-primary">{selectedDoctor.imageInitials}</span>
                   </div>
                   <div>
                     <p className="font-semibold">{selectedDoctor.name}</p>
@@ -286,10 +284,10 @@ export default function ConsultationPage() {
         </div>
       </div>
 
-      <Card className="mb-6 bg-blue-50 dark:bg-blue-950/20 border-blue-200">
+      <Card className="mb-6 border-primary/15 bg-primary/[0.04]">
         <CardContent className="flex items-center gap-3 py-3">
-          <Badge variant="default" className="bg-blue-500">DEMO</Badge>
-          <p className="text-sm text-blue-800 dark:text-blue-200">
+          <Badge variant="default">DEMO</Badge>
+          <p className="text-sm text-muted-foreground">
             {t("consultation.demoNotice")}
           </p>
         </CardContent>
@@ -343,8 +341,8 @@ export default function ConsultationPage() {
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                          <span className="text-sm font-bold text-blue-600">{doctor?.imageInitials || "DR"}</span>
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                          <span className="text-sm font-bold text-primary">{doctor?.imageInitials || "DR"}</span>
                         </div>
                         <div>
                           <p className="font-semibold">{consultation.doctorName}</p>
@@ -373,8 +371,8 @@ export default function ConsultationPage() {
           <Card key={doctor.id} className="hover:shadow-md transition-shadow">
             <CardContent className="p-4">
               <div className="flex items-start gap-4">
-                <div className="h-16 w-16 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center flex-shrink-0">
-                  <span className="text-lg font-bold text-white">{doctor.imageInitials}</span>
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/70">
+                  <span className="text-lg font-bold text-primary-foreground">{doctor.imageInitials}</span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
@@ -427,7 +425,7 @@ export default function ConsultationPage() {
       {completedConsultations.length > 0 && (
         <div className="mt-8">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-green-600" /> {t("consultation.pastConsultations")}
+            <CheckCircle className="h-5 w-5 text-success-soft-foreground" aria-hidden /> {t("consultation.pastConsultations")}
           </h2>
           <div className="grid gap-3">
             {completedConsultations.slice(0, 5).map((consultation) => (
@@ -435,7 +433,7 @@ export default function ConsultationPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-muted dark:bg-muted flex items-center justify-center">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
                         <span className="text-sm font-medium text-muted-foreground">{consultation.doctorName.split(" ").map(n => n[0]).join("")}</span>
                       </div>
                       <div>

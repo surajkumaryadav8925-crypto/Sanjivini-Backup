@@ -1,7 +1,7 @@
 ﻿"use client";
 import { useState, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Input } from "@/components/ui";
-import { Microscope, Search, MapPin, Phone, Navigation, Clock, AlertCircle, FlaskConical, Building2, Filter } from "lucide-react";
+import { Card, CardContent, Button, Badge, Input } from "@/components/ui";
+import { Search, MapPin, Phone, Navigation, Clock, AlertCircle, FlaskConical } from "lucide-react";
 import { SpeakButton } from "@/components/ui/SpeakButton";
 import { useTranslation } from "@/hooks/useTranslation";
 
@@ -129,18 +129,23 @@ export default function DiagnosticsPage() {
 
   return (
     <div className="container px-4 py-6 max-w-6xl mx-auto">
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1"><MapPin className="h-4 w-4" /><span>Bhagalpur, Bihar</span></div>
-          <h1 className="text-2xl font-bold">{t("diagnostics.title")}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{t("diagnostics.subtitle")}</p>
+          <div className="mb-1 flex items-center gap-1.5 text-sm text-muted-foreground"><MapPin className="h-4 w-4" aria-hidden /><span>Bhagalpur, Bihar</span></div>
+          <h1 className="flex items-center gap-2.5 text-2xl font-bold tracking-tight sm:text-3xl">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <FlaskConical className="h-5 w-5" aria-hidden />
+            </span>
+            {t("diagnostics.title")}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground sm:text-base">{t("diagnostics.subtitle")}</p>
         </div>
         <SpeakButton text={speakText} />
       </div>
-      <div className="flex flex-col md:flex-row gap-3 mb-6">
-        <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder={t("diagnostics.search")} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" /></div>
-        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="border rounded-lg px-3 py-2 w-full md:w-44 bg-background"><option value="all">{t("diagnostics.allCategories")}</option>{categories.map((cat) => (<option key={cat} value={cat}>{cat}</option>))}</select>
-        <select value={availabilityFilter} onChange={(e) => setAvailabilityFilter(e.target.value)} className="border rounded-lg px-3 py-2 w-full md:w-44 bg-background"><option value="all">{t("diagnostics.allAvailability")}</option><option value="available">{t("diagnostics.available")}</option><option value="limited">{t("diagnostics.limited")}</option></select>
+      <div className="mb-6 flex flex-col gap-3 md:flex-row">
+        <div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input placeholder={t("diagnostics.search")} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" /></div>
+        <select aria-label={t("diagnostics.allCategories")} value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="min-h-[38px] rounded-lg border bg-background px-3 text-sm md:w-44"><option value="all">{t("diagnostics.allCategories")}</option>{categories.map((cat) => (<option key={cat} value={cat}>{cat}</option>))}</select>
+        <select aria-label={t("diagnostics.allAvailability")} value={availabilityFilter} onChange={(e) => setAvailabilityFilter(e.target.value)} className="min-h-[38px] rounded-lg border bg-background px-3 text-sm md:w-44"><option value="all">{t("diagnostics.allAvailability")}</option><option value="available">{t("diagnostics.available")}</option><option value="limited">{t("diagnostics.limited")}</option></select>
       </div>
 
       {selectedTest ? (
@@ -154,10 +159,15 @@ export default function DiagnosticsPage() {
           </div>
           <div className="flex items-center gap-2 mb-4">
             <span className="text-sm text-muted-foreground">{t("diagnostics.filterBy")}:</span>
-            <select value={availabilityFilter} onChange={(e) => setAvailabilityFilter(e.target.value)} className="border rounded-lg px-3 py-1.5 text-sm bg-background"><option value="all">{t("diagnostics.allAvailability")}</option><option value="available">{t("diagnostics.available")}</option><option value="limited">{t("diagnostics.limited")}</option></select>
+            <select aria-label={t("diagnostics.allAvailability")} value={availabilityFilter} onChange={(e) => setAvailabilityFilter(e.target.value)} className="min-h-[38px] rounded-lg border bg-background px-3 text-sm"><option value="all">{t("diagnostics.allAvailability")}</option><option value="available">{t("diagnostics.available")}</option><option value="limited">{t("diagnostics.limited")}</option></select>
           </div>
           {getAvailability(selectedTest.id).length === 0 ? (
-            <Card><CardContent className="py-8 text-center text-muted-foreground">{t("diagnostics.noAvailability")}</CardContent></Card>
+            <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed py-12 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                <FlaskConical className="h-6 w-6 text-muted-foreground" aria-hidden />
+              </div>
+              <p className="font-medium">{t("diagnostics.noAvailability")}</p>
+            </div>
           ) : (
             <div className="grid gap-4">
               {getAvailability(selectedTest.id).map((item) => (
@@ -202,9 +212,9 @@ export default function DiagnosticsPage() {
                   <Card key={test.id} className="cursor-pointer hover:shadow-md hover:border-primary/50 transition-all" onClick={() => setSelectedTest(test)}>
                     <CardContent className="p-4">
                       <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0 mt-1">
-                          <div className="h-10 w-10 rounded-full bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center">
-                            <FlaskConical className="h-5 w-5 text-blue-600" />
+                        <div className="mt-1 flex shrink-0">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                            <FlaskConical className="h-5 w-5 text-primary" aria-hidden />
                           </div>
                         </div>
                         <div className="flex-1 min-w-0">
@@ -222,11 +232,11 @@ export default function DiagnosticsPage() {
         </div>
       )}
 
-      <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/20">
+      <Card className="border-warning-soft-foreground/20 bg-warning-soft">
         <CardContent className="pt-4">
           <div className="flex items-start gap-2">
-            <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5" />
-            <p className="text-sm text-amber-800 dark:text-amber-200">{t("diagnostics.disclaimer")}</p>
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-warning-soft-foreground" aria-hidden />
+            <p className="text-sm text-warning-soft-foreground">{t("diagnostics.disclaimer")}</p>
           </div>
         </CardContent>
       </Card>
