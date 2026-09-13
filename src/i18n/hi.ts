@@ -716,6 +716,21 @@ export const hi = {
       "afternoon": "नमस्कार",
       "evening": "शुभ संध्या"
     },
+    "hero": {
+      "tagline": "आपका स्वास्थ्य, एक ही जगह जुड़ा हुआ।",
+      "ctaPrimary": "अस्पताल खोजें",
+      "ctaSecondary": "ओपीडी बुक करें"
+    },
+    "qa": {
+      "hospitalsSub": "बेड, ओपीडी व आपातकाल",
+      "opdSub": "टोकन बुक करें",
+      "bloodSub": "उपलब्धता देखें",
+      "apptSub": "लाइव कतार स्थिति",
+      "medsSub": "आस-पास का स्टॉक",
+      "recordsSub": "आपका स्वास्थ्य इतिहास",
+      "diagnosticsSub": "जांच व लैब",
+      "emergencySub": "एसओएस, 24×7"
+    },
     "actions": {
       "hospitals": "अस्पताल खोजें",
       "appointments": "मेरे अपॉइंटमेंट",

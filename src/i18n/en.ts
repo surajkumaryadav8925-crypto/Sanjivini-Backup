@@ -716,6 +716,21 @@ export const en = {
       "afternoon": "Good afternoon",
       "evening": "Good evening"
     },
+    "hero": {
+      "tagline": "Your healthcare, connected in one place.",
+      "ctaPrimary": "Find hospitals",
+      "ctaSecondary": "Book OPD"
+    },
+    "qa": {
+      "hospitalsSub": "Beds, OPD & emergency",
+      "opdSub": "Book a token",
+      "bloodSub": "Check availability",
+      "apptSub": "Live queue status",
+      "medsSub": "Stock nearby",
+      "recordsSub": "Your health history",
+      "diagnosticsSub": "Tests & labs",
+      "emergencySub": "SOS, 24×7"
+    },
     "actions": {
       "hospitals": "Find Hospitals",
       "appointments": "My Appointments",

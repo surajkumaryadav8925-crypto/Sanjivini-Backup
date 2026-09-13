@@ -57,13 +57,16 @@ export function Header(){
   const navItems=isAuthenticated&&profile?navConfig[profile.role]||[]:[];
   const profileLink=profile?.role==="patient"?"/patient/profile":profile?.role==="hospital_staff"?"/hospital/profile":"/admin/profile";
   return(
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur-lg">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-xl">
       <div className="container flex h-16 items-center justify-between px-4">
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/20 transition-transform group-hover:scale-105">
-              <Heart className="h-5 w-5 text-white" />
-            </div>
+            <span className="relative flex items-center justify-center">
+              <span aria-hidden className="absolute inset-0 rounded-xl bg-primary/30 blur-md opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+              <span className="relative h-9 w-9 rounded-xl bg-gradient-to-br from-primary via-primary/90 to-info flex items-center justify-center shadow-lg shadow-primary/25 transition-transform duration-300 group-hover:scale-105">
+                <Heart className="animate-heartbeat h-5 w-5 text-white" />
+              </span>
+            </span>
             <span className="text-lg font-bold tracking-tight hidden sm:block">{t("common.appName")}</span>
           </Link>
           
@@ -71,12 +74,15 @@ export function Header(){
             <nav className="hidden lg:flex items-center gap-1">
               {navItems.map((item:NavItem)=>(
                 <Link key={item.href} href={item.href} className={cn(
-                  "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+                  "relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
                   pathname===item.href 
                     ? "bg-primary/10 text-primary" 
                     : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}>
-                  <item.icon className="h-4 w-4" />
+                  {pathname===item.href && (
+                    <span aria-hidden className="absolute inset-x-2.5 -bottom-[13px] h-0.5 rounded-full bg-gradient-to-r from-primary to-info" />
+                  )}
+                  <item.icon className={cn("h-4 w-4 transition-transform duration-200", pathname===item.href && "scale-110")} />
                   {t(item.labelKey)}
                 </Link>
               ))}
@@ -112,7 +118,7 @@ export function Header(){
               
               <div className="relative">
                 <Button variant="ghost" size="sm" onClick={()=>setProfileOpen(!profileOpen)} className="gap-2 h-9 rounded-lg">
-                  <div className="h-7 w-7 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
+                  <div className="h-7 w-7 rounded-full bg-gradient-to-br from-primary via-primary/80 to-info flex items-center justify-center shadow-sm shadow-primary/25">
                     <span className="text-xs text-white font-medium">{profile?.full_name?.charAt(0) || "U"}</span>
                   </div>
                   <span className="hidden md:inline text-sm font-medium">{profile?.full_name?.split(" ")[0] || "User"}</span>
@@ -146,7 +152,7 @@ export function Header(){
       </div>
 
       {mobileMenuOpen && (
-        <div className="lg:hidden border-t bg-background animate-in slide-in-from-top-2">
+        <div className="lg:hidden border-t bg-background/95 backdrop-blur-xl animate-fade-up">
           <nav className="container px-4 py-4 space-y-1">
             {navItems.map((item:NavItem)=>(
               <Link key={item.href} href={item.href} onClick={()=>setMobileMenuOpen(false)} className={cn(

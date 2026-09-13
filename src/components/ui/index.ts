@@ -6,6 +6,7 @@ export { Badge, badgeVariants } from './badge';
 export { Select } from './select';
 export { Alert, AlertTitle, AlertDescription } from './alert';
 export { Skeleton } from './skeleton';
+export { TiltCard } from './TiltCard';
 export { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from './dialog';
 export { Tabs, TabsList, TabsTrigger, TabsContent } from './tabs';
 export { Toaster, useToast } from './toast';

@@ -1,15 +1,19 @@
 "use client";
 /**
- * Patient dashboard — premium healthcare IA:
- * Greeting → Quick actions → Appointments (live queue) → Hospital discovery
- * → Emergency → Blood availability → Health services → Health info.
+ * Patient dashboard — premium healthcare IA (design system 2.0):
+ * Hero → Quick actions (3D tilt) → Appointments (live queue) → Hospital
+ * discovery → Emergency → Blood availability → Health services → Health info.
  * All data comes from the existing Phase 2 data layer (Supabase in
  * production, Zustand fixtures in demo mode). No new data sources.
+ * Sections cascade in with a gentle stagger; each section keeps its own
+ * loading / empty / error handling.
  */
 import { Greeting, QuickActions, AppointmentsSection, HospitalDiscovery, EmergencyCard, BloodSection, HealthServices, HealthStatus } from "@/components/dashboard/patient-sections";
 import { useSupabaseData } from "@/lib/data/mode";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuthStore } from "@/stores";
+
+const sections = [QuickActions, AppointmentsSection, HospitalDiscovery, EmergencyCard, BloodSection, HealthServices, HealthStatus] as const;
 
 export default function PatientDashboard() {
   const useDb = useSupabaseData();
@@ -33,13 +37,15 @@ export default function PatientDashboard() {
         )}
 
         <div className="mt-7 space-y-10 sm:space-y-12">
-          <QuickActions />
-          <AppointmentsSection />
-          <HospitalDiscovery />
-          <EmergencyCard />
-          <BloodSection />
-          <HealthServices />
-          <HealthStatus />
+          {sections.map((Section, i) => (
+            <div
+              key={Section.name}
+              className="animate-fade-up"
+              style={{ animationDelay: `${60 + i * 70}ms` }}
+            >
+              <Section />
+            </div>
+          ))}
         </div>
       </div>
       <div className="h-4" aria-hidden />

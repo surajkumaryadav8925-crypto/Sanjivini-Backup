@@ -46,18 +46,32 @@ export function PatientBottomNav() {
               href={item.href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "flex min-h-[3.5rem] flex-col items-center justify-center gap-0.5 px-1 py-1.5",
+                "relative flex min-h-[3.5rem] flex-col items-center justify-center gap-0.5 px-1 py-1.5",
                 "text-[11px] font-medium transition-colors",
                 active ? "text-primary" : "text-muted-foreground hover:text-foreground"
               )}
             >
+              {active && (
+                <span
+                  aria-hidden
+                  className="absolute top-0 h-0.5 w-8 rounded-full bg-gradient-to-r from-primary to-info"
+                />
+              )}
               <span
                 className={cn(
-                  "flex h-7 w-12 items-center justify-center rounded-full transition-colors",
-                  active && "bg-accent"
+                  "flex h-7 w-12 items-center justify-center rounded-full transition-all duration-200",
+                  active
+                    ? "bg-gradient-to-br from-primary/15 to-info/15 shadow-sm shadow-primary/15"
+                    : "group-hover:bg-muted"
                 )}
               >
-                <item.icon className="h-4.5 w-4.5" aria-hidden />
+                <item.icon
+                  className={cn(
+                    "h-4.5 w-4.5 transition-transform duration-200",
+                    active && "scale-110"
+                  )}
+                  aria-hidden
+                />
               </span>
               {t(item.labelKey)}
             </Link>

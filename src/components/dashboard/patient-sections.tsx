@@ -1,21 +1,23 @@
 "use client";
 
 /**
- * Patient dashboard — premium section components.
+ * Patient dashboard — premium section components (design system 2.0).
  * Each section owns its own loading / empty / error state and consumes the
  * SAME Phase 2 data layer as the rest of the app (Supabase in production,
  * Zustand fixtures in demo mode). No new data sources, no fake data.
+ *
+ * Visual layer: layered depth, per-card accent identities, pointer 3D tilt
+ * (TiltCard), staggered entrances, premium skeletons — all pure CSS/transform
+ * (no animation library), so it stays fast and reduced-motion safe.
  */
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Building2, Calendar, CalendarClock, Droplet, AlertTriangle, Stethoscope, Pill,
-  FlaskConical, Shield, FileText, Video, Heart, Activity, MapPin,
-  ArrowRight, Search, BedDouble, Users, Phone, RefreshCw,
-  Siren,
+  Building2, CalendarClock, Droplet, AlertTriangle, FileText, Heart, Activity,
+  MapPin, ArrowRight, Search, BedDouble, Users, Phone, RefreshCw, Siren, Sparkles,
 } from "lucide-react";
-import { Button, Badge, Skeleton, Input } from "@/components/ui";
+import { Button, Badge, Skeleton, Input, TiltCard } from "@/components/ui";
 import { SpeakButton } from "@/components/ui/SpeakButton";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuthStore } from "@/stores";
@@ -25,6 +27,7 @@ import { fetchMyBookings, fetchActiveQueues, type PatientBooking } from "@/lib/d
 import { fetchBloodBanks, type BloodBankView } from "@/lib/data/blood";
 import { useHospitalStore } from "@/stores";
 import { demoHospitals } from "@/data/hospitals";
+import { SCENES, VisualScene, type SceneKey } from "./quick-action-visuals";
 import { cn } from "@/lib/utils";
 
 /** Local interpolation for strings like "aheadOfYou": "{n} patients ahead of you". */
@@ -33,6 +36,25 @@ function tf(template: string, values: Record<string, string | number>): string {
     key in values ? String(values[key]) : `{${key}}`
   );
 }
+
+/* ------------------------------------------------------------------ */
+/*  Scene accents — per-card hover border tint, matched to its world   */
+/* ------------------------------------------------------------------ */
+
+const QA_BORDER: Record<SceneKey, string> = {
+  hospitals: "hover:border-primary/30",
+  opd: "hover:border-info/30",
+  blood: "hover:border-destructive/30",
+  appointments: "hover:border-violet/30",
+  medicines: "hover:border-success/30",
+  records: "hover:border-primary/30",
+  diagnostics: "hover:border-info/30",
+  emergency: "hover:border-destructive/35",
+  insurance: "hover:border-warning/30",
+  family: "hover:border-violet/30",
+  consultation: "hover:border-violet/30",
+  triage: "hover:border-primary/30",
+};
 
 /* ------------------------------------------------------------------ */
 /*  Small shared primitives                                            */
@@ -110,7 +132,7 @@ function InlineError({ onRetry, message }: { onRetry?: () => void; message?: str
 }
 
 /* ------------------------------------------------------------------ */
-/*  Greeting                                                           */
+/*  Hero                                                               */
 /* ------------------------------------------------------------------ */
 
 function greetingKey(): "dash.greeting.morning" | "dash.greeting.afternoon" | "dash.greeting.evening" {
@@ -124,21 +146,72 @@ export function Greeting() {
   const { t } = useTranslation();
   const profile = useAuthStore((s) => s.profile);
   const name = profile?.full_name?.trim() || t("login.patient");
+  const initials = name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
   const speakText = `${t(greetingKey())}, ${name}. ${t("patient.dashboard.welcomeMessage")}`;
 
   return (
-    <section className="animate-fade-up">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-muted-foreground">{t(greetingKey())}</p>
-          <h1 className="mt-1 truncate text-2xl font-bold tracking-tight sm:text-3xl">
-            {name}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground sm:text-base">
-            {t("patient.dashboard.welcomeMessage")}
-          </p>
+    <section className="animate-fade-up" aria-labelledby="dash-hero-title">
+      <div className="relative overflow-hidden rounded-3xl border bg-card shadow-md">
+        {/* Ambient depth — gradient blobs + dot grid */}
+        <div aria-hidden className="absolute inset-0 overflow-hidden">
+          <div className="hero-blob absolute -top-24 -right-16 h-72 w-72 rounded-full bg-primary/12 blur-3xl" />
+          <div className="hero-blob-alt absolute -bottom-28 -left-10 h-72 w-72 rounded-full bg-info/10 blur-3xl" />
+          <div className="absolute top-6 right-[30%] h-24 w-24 rounded-full bg-violet/10 blur-2xl" />
+          <div
+            className="absolute inset-0 opacity-[0.35]"
+            style={{
+              backgroundImage: "radial-gradient(hsl(174 30% 30% / 0.10) 1px, transparent 1px)",
+              backgroundSize: "22px 22px",
+            }}
+          />
+          {/* Floating decorative icon — subtle, paused for reduced motion via globals */}
+          <Sparkles className="hero-float absolute right-8 bottom-6 hidden h-16 w-16 text-primary/15 sm:block" aria-hidden />
         </div>
-        <SpeakButton text={speakText} className="h-9 w-9" />
+
+        <div className="relative flex flex-col gap-5 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
+          <div className="min-w-0">
+            <p className="inline-flex items-center gap-1.5 text-sm font-medium text-primary">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-success opacity-75 ring-ping" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
+              </span>
+              {t(greetingKey())}
+            </p>
+            <h1
+              id="dash-hero-title"
+              className="mt-1.5 truncate text-2xl font-bold tracking-tight sm:text-3xl"
+            >
+              {name}
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground sm:text-base">
+              {t("dash.hero.tagline")}
+            </p>
+            <div className="mt-5 flex flex-wrap items-center gap-2.5">
+              <Link href="/patient/hospitals">
+                <Button className="gap-2 shadow-md shadow-primary/25">
+                  <Building2 className="h-4 w-4" aria-hidden />
+                  {t("dash.hero.ctaPrimary")}
+                </Button>
+              </Link>
+              <Link href="/patient/opd">
+                <Button variant="outline" className="gap-2">
+                  <CalendarClock className="h-4 w-4" aria-hidden />
+                  {t("dash.hero.ctaSecondary")}
+                </Button>
+              </Link>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 self-start sm:self-auto">
+            <SpeakButton text={speakText} className="h-9 w-9" />
+            <span
+              aria-hidden
+              className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary via-primary/90 to-info text-lg font-bold text-primary-foreground shadow-lg shadow-primary/25 ring-2 ring-background"
+            >
+              {initials || "S"}
+            </span>
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -148,56 +221,67 @@ export function Greeting() {
 /*  Quick actions                                                      */
 /* ------------------------------------------------------------------ */
 
+interface QuickAction {
+  href: string;
+  scene: SceneKey;
+  label: string;
+  sub: string;
+  danger?: boolean;
+}
+
 export function QuickActions() {
   const { t } = useTranslation();
-  const actions = [
-    { href: "/patient/hospitals", icon: Building2, label: t("dash.actions.hospitals") },
-    { href: "/patient/opd", icon: Calendar, label: t("common.opd") },
-    { href: "/patient/blood", icon: Droplet, label: t("common.blood") },
-    { href: "/patient/opd", icon: CalendarClock, label: t("dash.actions.appointments") },
-    { href: "/patient/emergency", icon: Siren, label: t("common.emergency"), danger: true },
-    { href: "/patient/medicines", icon: Pill, label: t("dash.actions.medicines") },
+  const actions: QuickAction[] = [
+    { href: "/patient/hospitals", scene: "hospitals", label: t("dash.actions.hospitals"), sub: t("dash.qa.hospitalsSub") },
+    { href: "/patient/opd", scene: "opd", label: t("common.opd"), sub: t("dash.qa.opdSub") },
+    { href: "/patient/blood", scene: "blood", label: t("common.blood"), sub: t("dash.qa.bloodSub") },
+    { href: "/patient/opd", scene: "appointments", label: t("dash.actions.appointments"), sub: t("dash.qa.apptSub") },
+    { href: "/patient/medicines", scene: "medicines", label: t("dash.actions.medicines"), sub: t("dash.qa.medsSub") },
+    { href: "/patient/records", scene: "records", label: t("records.healthRecords"), sub: t("dash.qa.recordsSub") },
+    { href: "/patient/diagnostics", scene: "diagnostics", label: t("dash.services.diagnosticsName"), sub: t("dash.qa.diagnosticsSub") },
+    { href: "/patient/emergency", scene: "emergency", label: t("common.emergency"), sub: t("dash.qa.emergencySub"), danger: true },
   ];
 
   return (
     <section aria-label={t("status.quickActions")}>
       <SectionHeading title={t("status.quickActions")} />
       <div
-        className="grid grid-cols-3 gap-2.5 sm:grid-cols-6 sm:gap-3"
+        className="grid grid-cols-2 gap-3 sm:grid-cols-4"
         role="list"
       >
-        {actions.map((a) => (
-          <CardLink
-            key={a.label}
-            href={a.href}
-            role="listitem"
-            className={cn(
-              "flex flex-col items-center gap-2.5 p-3.5 text-center sm:gap-3 sm:p-4",
-              a.danger &&
-                "border-danger-soft bg-danger-soft/50 hover:border-destructive/40 hover:bg-danger-soft"
-            )}
-            ariaLabel={a.label}
-          >
-            <span
-              className={cn(
-                "flex h-11 w-11 items-center justify-center rounded-xl transition-transform duration-200 group-hover:scale-105",
-                a.danger
-                  ? "bg-destructive/10 text-destructive"
-                  : "bg-accent text-accent-foreground"
-              )}
-            >
-              <a.icon className="h-5 w-5" aria-hidden />
-            </span>
-            <span
-              className={cn(
-                "text-xs font-medium leading-tight sm:text-[13px]",
-                a.danger ? "text-destructive" : "text-foreground"
-              )}
-            >
-              {a.label}
-            </span>
-          </CardLink>
-        ))}
+        {actions.map((a) => {
+          const Scene = SCENES[a.scene];
+          return (
+            <TiltCard key={a.label} role="listitem" className="h-full">
+              <CardLink
+                href={a.href}
+                ariaLabel={`${a.label} — ${a.sub}`}
+                className={cn(
+                  "group/qa relative flex h-full items-center gap-1 overflow-hidden p-3 sm:gap-2 sm:p-4",
+                  QA_BORDER[a.scene],
+                  a.danger && "border-destructive/20 bg-danger-soft/60 hover:border-destructive/40"
+                )}
+              >
+                {/* Text block — left, 55-65% of the card */}
+                <span className="min-w-0 flex-1">
+                  <span className={cn("block text-[13px] font-semibold leading-tight sm:text-sm", a.danger && "text-destructive")}>
+                    {a.label}
+                  </span>
+                  <span className="mt-0.5 block text-[10.5px] leading-snug text-muted-foreground sm:text-[11px]">
+                    {a.sub}
+                  </span>
+                </span>
+                {/* 3D object — right, ~40% of the card, above the surface */}
+                <VisualScene
+                  label={`${a.label} ${a.sub}`}
+                  className="qa-visual -mr-1 h-[72px] w-[72px] shrink-0 sm:h-24 sm:w-24"
+                >
+                  <Scene />
+                </VisualScene>
+              </CardLink>
+            </TiltCard>
+          );
+        })}
       </div>
     </section>
   );
@@ -287,8 +371,8 @@ export function AppointmentsSection() {
 
       {loading && (
         <div className="grid gap-4 md:grid-cols-2" aria-hidden>
-          <Skeleton className="h-44 rounded-2xl" />
-          <Skeleton className="h-44 rounded-2xl" />
+          <Skeleton shimmer className="h-44 rounded-2xl" />
+          <Skeleton shimmer className="h-44 rounded-2xl" />
         </div>
       )}
 
@@ -302,68 +386,87 @@ export function AppointmentsSection() {
               {t("dash.appointments.emptyBody")}
             </p>
           </div>
-          <Button className="shrink-0">{t("dash.appointments.bookCta")}</Button>
+          <Button className="shrink-0 shadow-md shadow-primary/20">{t("dash.appointments.bookCta")}</Button>
         </CardLink>
       )}
 
       {hasData && active.length > 0 && (
-        <div className="grid gap-4 md:grid-cols-2 animate-stagger">
+        <div className="grid gap-4 md:grid-cols-2">
           {active.map((b) => {
             const now = nowServingMap[b.queue_id] ?? b.current_token;
             const ahead = Math.max(0, b.token_number - now);
             const aheadText = tf(t("dash.appointments.aheadOfYou"), { n: ahead });
             const done = b.status === "called";
+            // Progress visualization — real numbers only (token vs now-serving).
+            const total = Math.max(b.token_number, 1);
+            const servedPct = Math.min(100, Math.max(0, ((now || 0) / total) * 100));
             return (
-              <CardLink
-                key={b.token_id}
-                href="/patient/opd"
-                className={cn(
-                  "p-5",
-                  done ? "border-primary/30 bg-accent/60" : undefined
-                )}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold">{b.hospital_name}</p>
-                    <p className="mt-0.5 truncate text-sm text-muted-foreground">
-                      {b.department}
-                    </p>
+              <TiltCard key={b.token_id} className="h-full">
+                <CardLink
+                  href="/patient/opd"
+                  className={cn(
+                    "flex h-full flex-col p-5",
+                    done ? "border-primary/30 bg-accent/60" : undefined
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">{b.hospital_name}</p>
+                      <p className="mt-0.5 truncate text-sm text-muted-foreground">
+                        {b.department}
+                      </p>
+                    </div>
+                    <Badge
+                      variant={done ? "success" : "info"}
+                      className={cn(
+                        "shrink-0",
+                        done ? "bg-success-soft text-success-soft-foreground" : "bg-info-soft text-info-soft-foreground"
+                      )}
+                    >
+                      {done ? t("dash.appointments.beingCalled") : t("dash.appointments.waiting")}
+                    </Badge>
                   </div>
-                  <Badge
-                    variant={done ? "success" : "info"}
-                    className={cn(
-                      "shrink-0",
-                      done ? "bg-success-soft text-success-soft-foreground" : "bg-accent text-accent-foreground"
-                    )}
+
+                  <div className="mt-5 flex items-end gap-6">
+                    <div>
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {t("dash.appointments.yourToken")}
+                      </p>
+                      <p className="text-3xl font-bold tabular-nums tracking-tight">
+                        #{b.token_number}
+                      </p>
+                    </div>
+                    <div className="border-l pl-6">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {t("dash.appointments.nowServing")}
+                      </p>
+                      <p className="text-3xl font-bold tabular-nums tracking-tight text-primary">
+                        #{now || "–"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Queue progress — only from real token numbers */}
+                  <div
+                    className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-muted"
+                    role="progressbar"
+                    aria-valuenow={now || 0}
+                    aria-valuemin={0}
+                    aria-valuemax={b.token_number}
+                    aria-label={t("dash.appointments.nowServing")}
                   >
-                    {done ? t("dash.appointments.beingCalled") : t("dash.appointments.waiting")}
-                  </Badge>
-                </div>
-
-                <div className="mt-5 flex items-end gap-6">
-                  <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                      {t("dash.appointments.yourToken")}
-                    </p>
-                    <p className="text-3xl font-bold tabular-nums tracking-tight">
-                      #{b.token_number}
-                    </p>
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-info to-primary transition-[width] duration-500"
+                      style={{ width: `${servedPct}%` }}
+                    />
                   </div>
-                  <div className="border-l pl-6">
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                      {t("dash.appointments.nowServing")}
-                    </p>
-                    <p className="text-3xl font-bold tabular-nums tracking-tight text-primary">
-                      #{now || "–"}
-                    </p>
-                  </div>
-                </div>
 
-                <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-                  <Users className="h-4 w-4" aria-hidden />
-                  {aheadText}
-                </div>
-              </CardLink>
+                  <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+                    <Users className="h-4 w-4" aria-hidden />
+                    {aheadText}
+                  </div>
+                </CardLink>
+              </TiltCard>
             );
           })}
         </div>
@@ -457,9 +560,9 @@ export function HospitalDiscovery() {
 
       {loading && (
         <div className="grid gap-4 md:grid-cols-3" aria-hidden>
-          <Skeleton className="h-40 rounded-2xl" />
-          <Skeleton className="h-40 rounded-2xl" />
-          <Skeleton className="h-40 rounded-2xl" />
+          <Skeleton shimmer className="h-44 rounded-2xl" />
+          <Skeleton shimmer className="h-44 rounded-2xl" />
+          <Skeleton shimmer className="h-44 rounded-2xl" />
         </div>
       )}
 
@@ -467,39 +570,53 @@ export function HospitalDiscovery() {
 
       {!loading && !error && (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 animate-stagger">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {list.map((h) => (
-              <CardLink key={h.id} href={`/patient/hospitals/${h.id}`} className="flex flex-col p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
-                    <Building2 className="h-5 w-5" aria-hidden />
-                  </div>
-                  {h.emergencyAvailable && (
-                    <Badge className="bg-danger-soft text-danger-soft-foreground border-0">
-                      {t("dash.discovery.emergencyTag")}
-                    </Badge>
-                  )}
-                </div>
-                <p className="mt-3 font-semibold leading-snug">{h.name}</p>
-                <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  <span className="truncate">{h.district}</span>
-                </p>
-                <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground border-t pt-3">
-                  <span className="inline-flex items-center gap-1">
-                    <BedDouble className="h-3.5 w-3.5" aria-hidden />
-                    {h.availableBeds > 0
-                      ? tf(t("dash.discovery.bedsAvailable"), { n: h.availableBeds })
-                      : t("dash.discovery.bedsFull")}
-                  </span>
-                  {h.bloodBankAvailable && (
-                    <span className="inline-flex items-center gap-1">
-                      <Droplet className="h-3.5 w-3.5" aria-hidden />
-                      {t("common.bloodBank")}
+              <TiltCard key={h.id} className="h-full" maxTilt={3.5}>
+                <CardLink href={`/patient/hospitals/${h.id}`} className="flex h-full flex-col p-5">
+                  {/* Visual header — gradient banner per hospital */}
+                  <div
+                    aria-hidden
+                    className="relative -mx-5 -mt-5 mb-4 h-16 overflow-hidden rounded-t-2xl bg-gradient-to-br from-primary/15 via-info/10 to-violet/10"
+                  >
+                    <div className="absolute -right-3 -top-6 h-20 w-20 rounded-full bg-primary/10 blur-xl" />
+                    <span className="absolute bottom-3 left-5 flex h-11 w-11 items-center justify-center rounded-xl border bg-card text-primary shadow-sm tilt-pop">
+                      <Building2 className="h-5 w-5" aria-hidden />
                     </span>
-                  )}
-                </div>
-              </CardLink>
+                  </div>
+
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="font-semibold leading-snug">{h.name}</p>
+                    {h.emergencyAvailable && (
+                      <Badge className="shrink-0 gap-1 border-0 bg-danger-soft text-danger-soft-foreground">
+                        <span className="relative flex h-1.5 w-1.5">
+                          <span className="absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75 ring-ping" />
+                          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-destructive" />
+                        </span>
+                        {t("dash.discovery.emergencyTag")}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    <span className="truncate">{h.district}</span>
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground border-t pt-3">
+                    <span className="inline-flex items-center gap-1">
+                      <BedDouble className={cn("h-3.5 w-3.5", h.availableBeds > 0 ? "text-success" : "text-destructive")} aria-hidden />
+                      {h.availableBeds > 0
+                        ? tf(t("dash.discovery.bedsAvailable"), { n: h.availableBeds })
+                        : t("dash.discovery.bedsFull")}
+                    </span>
+                    {h.bloodBankAvailable && (
+                      <span className="inline-flex items-center gap-1">
+                        <Droplet className="h-3.5 w-3.5 text-destructive/80" aria-hidden />
+                        {t("common.bloodBank")}
+                      </span>
+                    )}
+                  </div>
+                </CardLink>
+              </TiltCard>
             ))}
           </div>
 
@@ -556,11 +673,11 @@ function bloodLevel(units: number | undefined, min: number): BloodLevel {
   return "ok";
 }
 
-const levelStyles: Record<BloodLevel, { chip: string; label: string; key: string }> = {
-  ok: { chip: "bg-success-soft text-success-soft-foreground border-success/20", label: "Available", key: "common.available" },
-  low: { chip: "bg-warning-soft text-warning-soft-foreground border-warning/25", label: "Low", key: "dash.blood.low" },
-  out: { chip: "bg-danger-soft text-danger-soft-foreground border-destructive/20", label: "Out", key: "dash.blood.out" },
-  unknown: { chip: "bg-muted text-muted-foreground border-border", label: "—", key: "dash.blood.unknown" },
+const levelStyles: Record<BloodLevel, { chip: string; key: string }> = {
+  ok: { chip: "bg-success-soft text-success-soft-foreground border-success/20", key: "common.available" },
+  low: { chip: "bg-warning-soft text-warning-soft-foreground border-warning/25", key: "dash.blood.low" },
+  out: { chip: "bg-danger-soft text-danger-soft-foreground border-destructive/20", key: "dash.blood.out" },
+  unknown: { chip: "bg-muted text-muted-foreground border-border", key: "dash.blood.unknown" },
 };
 
 export function BloodSection() {
@@ -626,64 +743,70 @@ export function BloodSection() {
         </Link>
       </SectionHeading>
 
-      {loading && <Skeleton className="h-44 rounded-2xl" aria-hidden />}
+      {loading && <Skeleton shimmer className="h-44 rounded-2xl" aria-hidden />}
       {!loading && error && <InlineError onRetry={() => setReload((n) => n + 1)} />}
 
       {!loading && !error && (
-        <div className="rounded-2xl border bg-card p-5 shadow-xs">
-          <div className="grid grid-cols-4 gap-2.5 sm:grid-cols-8">
-            {groups.map((group) => {
-              const units = unitsByGroup[group];
-              const level = bloodLevel(units, minThreshold);
-              const style = levelStyles[level];
-              return (
-                <div
-                  key={group}
-                  className={cn(
-                    "flex flex-col items-center gap-1.5 rounded-xl border px-2 py-3 transition-colors",
-                    style.chip
-                  )}
-                >
-                  <span className="text-base font-bold leading-none">{group}</span>
-                  <span className="text-[11px] font-medium leading-none opacity-80">
-                    {units == null ? "—" : `${units} u`}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-success" aria-hidden />
-                {t("common.available")}
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-warning" aria-hidden />
-                {t("dash.blood.low")}
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-destructive" aria-hidden />
-                {t("dash.blood.out")}
-              </span>
+        <TiltCard maxTilt={2.5}>
+          <div className="relative overflow-hidden rounded-2xl border bg-card p-5 shadow-xs">
+            {/* Rosy ambient corner for the blood identity */}
+            <div aria-hidden className="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-destructive/8 blur-2xl" />
+
+            <div className="relative grid grid-cols-4 gap-2.5 sm:grid-cols-8">
+              {groups.map((group) => {
+                const units = unitsByGroup[group];
+                const level = bloodLevel(units, minThreshold);
+                const style = levelStyles[level];
+                return (
+                  <div
+                    key={group}
+                    className={cn(
+                      "flex flex-col items-center gap-1.5 rounded-xl border px-2 py-3 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-sm",
+                      style.chip
+                    )}
+                  >
+                    <span className="text-base font-bold leading-none">{group}</span>
+                    <span className="text-[11px] font-medium leading-none opacity-80">
+                      {units == null ? "—" : `${units} u`}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Link href="/patient/blood">
-                <Button variant="outline" size="sm">{t("dash.blood.viewAll")}</Button>
-              </Link>
-              <Link href="/patient/blood">
-                <Button size="sm">{t("dash.blood.requestCta")}</Button>
-              </Link>
+
+            <div className="relative mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-success" aria-hidden />
+                  {t("common.available")}
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-warning" aria-hidden />
+                  {t("dash.blood.low")}
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-destructive" aria-hidden />
+                  {t("dash.blood.out")}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Link href="/patient/blood">
+                  <Button variant="outline" size="sm">{t("dash.blood.viewAll")}</Button>
+                </Link>
+                <Link href="/patient/blood">
+                  <Button size="sm">{t("dash.blood.requestCta")}</Button>
+                </Link>
+              </div>
             </div>
           </div>
-        </div>
+        </TiltCard>
       )}
     </section>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/*  Emergency — compact, unmistakable, calm                            */
+/*  Emergency — unmistakable, calm                                     */
 /* ------------------------------------------------------------------ */
 
 export function EmergencyCard() {
@@ -691,10 +814,14 @@ export function EmergencyCard() {
 
   return (
     <section aria-label={t("common.emergency")}>
-      <div className="flex flex-col gap-4 rounded-2xl border border-destructive/25 bg-danger-soft p-5 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-3.5">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
-            <Siren className="h-5 w-5" aria-hidden />
+      <div className="relative flex flex-col gap-4 overflow-hidden rounded-2xl border border-destructive/25 bg-danger-soft p-5 shadow-md shadow-destructive/10 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+        {/* Controlled ambient glow — calm, not flashing */}
+        <div aria-hidden className="absolute -left-12 -top-16 h-48 w-48 rounded-full bg-destructive/10 blur-3xl" />
+
+        <div className="relative flex items-start gap-3.5">
+          <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+            <span aria-hidden className="absolute inset-0 rounded-xl ring-ping ring-1 ring-destructive/40" />
+            <Siren className="animate-heartbeat h-5 w-5" aria-hidden />
           </span>
           <div>
             <p className="font-semibold text-danger-soft-foreground">
@@ -705,9 +832,10 @@ export function EmergencyCard() {
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2 pl-[3.75rem] sm:pl-0">
+
+        <div className="relative flex flex-wrap items-center gap-2 pl-[3.75rem] sm:pl-0">
           <Link href="/patient/emergency">
-            <Button variant="destructive" size="sm" className="gap-1.5">
+            <Button variant="destructive" size="sm" className="gap-1.5 shadow-md shadow-destructive/25">
               <Phone className="h-3.5 w-3.5" aria-hidden /> SOS
             </Button>
           </Link>
@@ -739,39 +867,57 @@ export function EmergencyCard() {
 /*  Health services grid                                               */
 /* ------------------------------------------------------------------ */
 
+interface Service {
+  href: string;
+  scene: SceneKey;
+  name: string;
+  desc: string;
+}
+
 export function HealthServices() {
   const { t } = useTranslation();
-  const services = [
-    { href: "/patient/hospitals", icon: Building2, name: t("common.hospitals"), desc: t("dash.services.hospitals") },
-    { href: "/patient/opd", icon: Calendar, name: t("common.opd"), desc: t("dash.services.opd") },
-    { href: "/patient/blood", icon: Droplet, name: t("common.blood"), desc: t("dash.services.blood") },
-    { href: "/patient/emergency", icon: Siren, name: t("common.emergency"), desc: t("dash.services.emergency") },
-    { href: "/patient/insurance", icon: Shield, name: t("common.insurance"), desc: t("dash.services.insurance") },
-    { href: "/patient/family", icon: Users, name: t("common.family"), desc: t("dash.services.family") },
-    { href: "/patient/diagnostics", icon: FlaskConical, name: t("dash.services.diagnosticsName"), desc: t("dash.services.diagnostics") },
-    { href: "/patient/medicines", icon: Pill, name: t("dash.actions.medicines"), desc: t("dash.services.medicines") },
-    { href: "/patient/consultation", icon: Video, name: t("dash.services.consultationName"), desc: t("dash.services.consultation") },
-    { href: "/patient/records", icon: FileText, name: t("records.healthRecords"), desc: t("dash.services.records") },
-    { href: "/patient/triage", icon: Stethoscope, name: t("common.triage"), desc: t("dash.services.triage") },
+  const services: Service[] = [
+    { href: "/patient/hospitals", scene: "hospitals", name: t("common.hospitals"), desc: t("dash.services.hospitals") },
+    { href: "/patient/opd", scene: "opd", name: t("common.opd"), desc: t("dash.services.opd") },
+    { href: "/patient/blood", scene: "blood", name: t("common.blood"), desc: t("dash.services.blood") },
+    { href: "/patient/emergency", scene: "emergency", name: t("common.emergency"), desc: t("dash.services.emergency") },
+    { href: "/patient/insurance", scene: "insurance", name: t("common.insurance"), desc: t("dash.services.insurance") },
+    { href: "/patient/family", scene: "family", name: t("common.family"), desc: t("dash.services.family") },
+    { href: "/patient/diagnostics", scene: "diagnostics", name: t("dash.services.diagnosticsName"), desc: t("dash.services.diagnostics") },
+    { href: "/patient/medicines", scene: "medicines", name: t("dash.actions.medicines"), desc: t("dash.services.medicines") },
+    { href: "/patient/consultation", scene: "consultation", name: t("dash.services.consultationName"), desc: t("dash.services.consultation") },
+    { href: "/patient/records", scene: "records", name: t("records.healthRecords"), desc: t("dash.services.records") },
+    { href: "/patient/triage", scene: "triage", name: t("common.triage"), desc: t("dash.services.triage") },
   ];
 
   return (
     <section>
       <SectionHeading title={t("dash.services.title")} subtitle={t("dash.services.subtitle")} />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 animate-stagger">
-        {services.map((s) => (
-          <CardLink key={s.href} href={s.href} className="flex items-start gap-3.5 p-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground transition-transform duration-200 group-hover:scale-105">
-              <s.icon className="h-5 w-5" aria-hidden />
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate text-sm font-semibold">{s.name}</span>
-              <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
-                {s.desc}
-              </span>
-            </span>
-          </CardLink>
-        ))}
+        {services.map((s) => {
+          const Scene = SCENES[s.scene];
+          return (
+            <TiltCard key={s.href + s.name} className="h-full" maxTilt={4}>
+              <CardLink
+                href={s.href}
+                className={cn(
+                  "group/qa relative flex h-full items-center gap-2.5 p-4",
+                  QA_BORDER[s.scene]
+                )}
+              >
+                <VisualScene label={`${s.name}: ${s.desc}`} className="qa-visual h-[72px] w-[72px] shrink-0">
+                  <Scene />
+                </VisualScene>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold">{s.name}</span>
+                  <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+                    {s.desc}
+                  </span>
+                </span>
+              </CardLink>
+            </TiltCard>
+          );
+        })}
       </div>
     </section>
   );
@@ -787,8 +933,9 @@ export function HealthStatus() {
   return (
     <section>
       <SectionHeading title={t("dash.health.title")} />
-      <div className="rounded-2xl border border-dashed bg-card/50 p-6">
-        <div className="flex items-start gap-4">
+      <div className="relative overflow-hidden rounded-2xl border border-dashed bg-card/60 p-6">
+        <div aria-hidden className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-primary/5 blur-2xl" />
+        <div className="relative flex items-start gap-4">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
             <Activity className="h-5 w-5" aria-hidden />
           </span>
